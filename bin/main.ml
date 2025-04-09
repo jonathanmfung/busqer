@@ -47,10 +47,7 @@ let metadata_init proxy :
       (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.metadata proxy)
   in
   let e = Lwt_react.S.changes metadata_monitor in
-  let i = ref 0 in
   let rec r () =
-    let* () = Lwt_io.printf "%i\n" !i in
-    i := !i + 1;
     let* () = Lwt_unix.sleep 1.0 in
     r ()
   in
@@ -107,7 +104,7 @@ let () =
 (*   in *)
 (*   (e, r) *)
 
-(* let _clock = *)
+(* let _clock_main = *)
 (*   let (seconds : float React.event), (run : unit -> 'a) = clock_init () in *)
 (*   let _ = React.E.map pr_time seconds in *)
 (*   run () *)
