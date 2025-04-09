@@ -1,0 +1,44 @@
+#+begin_src bash
+opam exec -- obus-introspect -rec org.mpris.MediaPlayer2.spotify / > data/spotify.xml
+opam exec -- obus-gen-interface data/spotify.xml
+opam exec -- obus-gen-client data/spotify.xml
+
+opam exec -- dune pkg lock
+opam exec -- dune exec spotify_dbus
+#+end_src
+
+
+- Simple Spotify interface through DBus
+  - [ ] Display Album Art (metadata - mpris:artUrl)
+  - [ ] Display artist (metadata - xesam:artist)
+  - [ ] Display album (metadata - xesam:album)
+  - [ ] Display song title (metadata - xesam:title)
+  - [ ] Show Volume (Player.volume)
+    - [ ] Set Volume
+  - [ ] Show Position (Player.position; metadata - mpris:length)
+    - [ ] Set Position
+  - [ ] Controls: Previous, PlayPause, Next
+  - [ ] Color background with dominant color of Album Art (mean shift clustering?)
+
+- TODO: When Metadata property changes, the org.freedesktop.DBus.Properties.PropertiesChanged signal is emitted with the new value.
+  - org.freedesktop.DBus.Properties.PropertiesChanged (STRING interface_name, ARRAY of DICT_ENTRY<STRING,VARIANT> changed_properties, ARRAY<STRING> invalidated_properties);
+  - https://dbus.freedesktop.org/doc/dbus-specification.html
+  - OBus_object.on_properties_changed
+
+#+begin_src python :results output
+curr_ms = 66937000
+len_ms = 151533000
+
+def ms_to_min_sec(ms):
+    st = ms / 1e6
+    m = int(st // 60)
+    s = st % 60
+    return f"{m}:{s:05.2f}"
+
+print(ms_to_min_sec(curr_ms))
+print(ms_to_min_sec(len_ms))
+#+end_src
+
+#+RESULTS:
+: 1:06.94
+: 2:31.53
