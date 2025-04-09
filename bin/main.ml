@@ -40,30 +40,63 @@ let spotify_proxy bus =
       (OBus_peer.make ~connection:bus ~name:"org.mpris.MediaPlayer2.spotify")
     ~path:[ "org"; "mpris"; "MediaPlayer2" ]
 
-let metadata_init proxy :
-    ((string * OBus_value.V.single) list React.event * 'a) Lwt.t =
+let metadata_init
+    proxy (* : (string * OBus_value.V.single) list React.event Lwt.t *) =
   let* metadata_monitor =
     OBus_property.monitor
       (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.metadata proxy)
   in
-  let e = Lwt_react.S.changes metadata_monitor in
-  let rec r () =
-    let* () = Lwt_unix.sleep 1.0 in
-    r ()
-  in
-  Lwt.return (e, r)
+  (* let e = Lwt_react.S.changes metadata_monitor in *)
+  Lwt.return metadata_monitor
 
-let pr_metadata md : unit Lwt.t =
+let volume_init proxy (* : float React.event Lwt.t *) =
+  let* volume_monitor =
+    OBus_property.monitor
+      (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.volume proxy)
+  in
+  (* let e = Lwt_react.S.changes volume_monitor in *)
+  Lwt.return volume_monitor
+
+let pr_metadata_full md : unit Lwt.t =
   Lwt_list.iter_p
     (fun (k, v) -> Lwt_io.printf "%s: %s\n" k (OBus_value.V.string_of_single v))
     md
 
+let pr_metadata_artUrl md : unit Lwt.t =
+  let v = List.assoc_opt "mpris:artUrl" md in
+  let v' = Option.map OBus_value.V.string_of_single v in
+  let v'' = Option.value v' ~default:"NOT FOUND" in
+  Lwt_io.printf "mpris:artUrl: %s\n" v''
+
+let pr_volume v = Format.sprintf "Volume: %5.1f" (100.0 *. v)
+
+let pr_metadata md =
+  let artist = List.assoc_opt "xesam:artist" md in
+  (* TODO: Convert single_list.t to string with delims, no braces  *)
+  let artist' = Option.map OBus_value.V.string_of_single artist in
+  let artist'' = Option.value artist' ~default:"NOT FOUND" in
+  let title = List.assoc_opt "xesam:title" md in
+  let title' = Option.map OBus_value.V.string_of_single title in
+  let title'' = Option.value title' ~default:"NOT FOUND" in
+  Format.sprintf "%s - %s, " artist'' title''
+
 let () =
   Lwt_main.run
-    (let* bus = OBus_bus.session () in
+    (let rec run () =
+       (* TODO: this sleep doesn't actually block output *)
+       let* () = Lwt_unix.sleep 1.0 in
+       run ()
+     in
+     let* bus = OBus_bus.session () in
      let proxy = spotify_proxy bus in
-     let* metadata, run = metadata_init proxy in
-     let _ = Lwt_react.E.map pr_metadata metadata in
+     let* metadata = metadata_init proxy in
+     let* volume = volume_init proxy in
+     let metadata_s : string React.signal =
+       Lwt_react.S.map pr_metadata metadata
+     in
+     let volume_s : string React.signal = Lwt_react.S.map pr_volume volume in
+     let state_s = Lwt_react.S.merge ( ^ ) "" [ metadata_s; volume_s ] in
+     let _ = Lwt_react.S.map Lwt_io.printl state_s in
      run ())
 
 (* let () = *)
@@ -86,7 +119,6 @@ let () =
 (*       echo_loop () *)
 (*   in *)
 (*   Lwt_main.run (echo_loop ()) *)
-
 
 (* ************************************************************************** *)
 (* let pr_time (t : float) : unit = *)

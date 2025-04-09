@@ -16,7 +16,7 @@ opam exec -- dune exec spotify_dbus
   - [ ] Show Volume (Player.volume)
     - [ ] Set Volume
   - [ ] Show Position (Player.position; metadata - mpris:length)
-    - [ ] Set Position
+    - [ ] Set Position (Seeking)
   - [ ] Controls: Previous, PlayPause, Next
   - [ ] Color background with dominant color of Album Art (mean shift clustering?)
 
