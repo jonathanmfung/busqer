@@ -59,6 +59,13 @@ let position_init proxy =
   let signal, set = Lwt_react.S.create init_pos in
   Lwt.return (signal, set)
 
+let seeked_init proxy =
+  let* seeked_signal =
+    OBus_signal.connect
+      (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.seeked proxy)
+  in
+  Lwt.return seeked_signal
+
 (* * *)
 
 let pr_metadata md =
@@ -107,15 +114,13 @@ let pr_metadata_artUrl md : unit Lwt.t =
   let v'' = Option.value v' ~default:"NOT FOUND" in
   Lwt_io.printf "mpris:artUrl: %s\n" v''
 
-(* TODO: listen to Seeked signal to update position *)
-
-(* TODO: How to update position_val when next track?
+(* NOTE: How to update position_val when next track?
    Check if position_val is greater than length? How to ensure that length always refers to current track? and not next
 
    I think spotify emits Seeked when track changes, but
    spec says: "[Seeked ]does not need to be emitted when playback starts or when the track changes, unless the track is starting at an unexpected position"
 
-   It seems that spotify Seeked does not start at 0, so not sure if this is unexpected or not
+   It seems that spotify Seeked on track change does not start at 0, so not sure if this is "unexpected" or not.
 *)
 
 let () =
@@ -128,9 +133,12 @@ let () =
      let* pbs = playback_status_init proxy in
      let* position, position_set = position_init proxy in
      let* rate = rate_init proxy in
+     let* seeked = seeked_init proxy in
 
-     let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in
      (* up cursor, erase whole line *)
+     let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in
+
+     (* TODO rename these string names *)
      let metadata_s : string React.signal =
        Lwt_react.S.map pr_metadata metadata
      in
@@ -140,11 +148,16 @@ let () =
 
      (* TODO: Can I just make a full format function that works (up to l6)? *)
      let state_s =
-       Lwt_react.S.merge ( ^ ) "" [ metadata_s; volume_s; pbs_s; position_s ]
+       Lwt_react.S.merge ( ^ ) ""
+         [ erase_s; metadata_s; volume_s; pbs_s; position_s ]
      in
+
+     (* Attached Actions *)
+     let _ = Lwt_react.E.map position_set seeked in
      let _ = Lwt_react.S.map Lwt_io.printl state_s in
 
      let update_position pos setter =
+       (* TODO: change 1m to be calculated from rate *)
        let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in
        (* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *)
        let () = setter new_pos in
