@@ -1,5 +1,5 @@
 (executable
  (public_name spotify_dbus)
  (name main)
- (libraries spotify_dbus)
+ (libraries spotify_dbus bogue)
  (flags (:standard -w -unused-value-declaration -w -unused-var-strict -w -unused-var)))

@@ -21,7 +21,8 @@
  (description "A longer description")
  (depends ocaml dune
   obus
-  utop)
+  utop
+  bogue)
  (tags
   (topics "to describe" your project)))
 

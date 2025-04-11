@@ -8,6 +8,15 @@ in
 pkgs.mkShell {
   pname = "water_sort";
   src = ./.;
+  buildInputs = with pkgs; [
+    pkg-config
+
+    # Deps for bogue
+    libffi
+    SDL2
+    SDL2_image
+    SDL2_ttf
+  ];
   packages = with pkgs; [
     opam
     ocamlPackages.ocaml

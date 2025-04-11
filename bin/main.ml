@@ -75,7 +75,7 @@ let pr_metadata_artUrl md : unit Lwt.t =
    It seems that spotify Seeked on track change does not start at 0, so not sure if this is "unexpected" or not.
 *)
 
-let () =
+let cli () =
   Lwt_main.run
     (* Setup *)
     (let* bus = OBus_bus.session () in
@@ -129,3 +129,28 @@ let () =
        update_loop ()
      in
      update_loop ())
+
+open Bogue
+module W = Widget
+module L = Layout
+
+let bogue_test () =
+  let input = W.text_input ~max_size:200 ~prompt:"Enter your name" () in
+  let label = W.label ~size:40 "Hello!" in
+  let layout =
+    L.tower [ L.resident ~w:400 input; L.resident ~w:400 ~h:200 label ]
+  in
+
+  let before_display () =
+    let text = W.get_text input in
+    W.set_text label ("Hello " ^ text ^ "!")
+  in
+
+  let board = Bogue.make [] [ layout ] in
+  Bogue.run ~before_display board
+
+(* let () = cli () *)
+
+let () =
+  bogue_test ();
+  Draw.quit ()
