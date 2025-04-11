@@ -23,13 +23,28 @@ let volume_init proxy : float Lwt_react.signal Lwt.t =
   (* let e = Lwt_react.S.changes volume_monitor in *)
   Lwt.return volume_monitor
 
+(* TODO: create type for PlaybackStatus *)
+
+type playback_status_t = Playing | Paused | Stopped
+
+let playback_status_of_string = function
+  | "Playing" -> Playing
+  | "Paused" -> Paused
+  | "Stopped" -> Stopped
+  | _ -> failwith "playback_status_of_string: Invalid PlaybackStatus"
+
+let playback_status_to_string = function
+  | Playing -> "Playing"
+  | Paused -> "Paused"
+  | Stopped -> "Stopped"
+
 let playback_status_init proxy =
   let* pbs_monitor =
     OBus_property.monitor
       (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player
        .playback_status proxy)
   in
-  Lwt.return pbs_monitor
+  Lwt.return (Lwt_react.S.map playback_status_of_string pbs_monitor)
 
 let rate_init proxy =
   let* rate_monitor =
@@ -37,6 +52,7 @@ let rate_init proxy =
       (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.rate proxy)
   in
   Lwt.return rate_monitor
+
 (* TODO: Need a way to update position signal (NOT OBus signal)
    This needs to tick every 1 second (x rate):
    Lwt_react.S.map +1e6 position_s
@@ -46,11 +62,12 @@ let rate_init proxy =
 *)
 
 let position_init proxy =
-  let* position_monitor =
-    OBus_property.monitor
+  let* init_pos =
+    OBus_property.get
       (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.position proxy)
   in
-  Lwt.return position_monitor
+  let signal, set = Lwt_react.S.create init_pos in
+  Lwt.return (signal, set)
 
 (* * *)
 
@@ -66,7 +83,9 @@ let pr_metadata md =
   Format.sprintf "%s - %s, " artist'' title''
 
 let pr_volume v = Format.sprintf "Volume: %5.1f, " (100.0 *. v)
-let pr_playback_status pbs = Format.sprintf "Status: %7s" pbs
+
+let pr_playback_status pbs =
+  Format.sprintf "Status: %7s" (playback_status_to_string pbs)
 
 let microsecond_to_minsec (ms : int64) =
   let secs = Int64.div ms 1_000_000L in
@@ -106,21 +125,27 @@ let pr_metadata_artUrl md : unit Lwt.t =
      (This also needs PlaybackStatus property)
 *)
 
+(* TODO: How to update position_val when next track?
+   Check if position_val is greater than length? How to ensure that length always refers to current track? and not next
+
+   I think spotify emits Seeked when track changes, but
+   spec says: "[Seeked ]does not need to be emitted when playback starts or when the track changes, unless the track is starting at an unexpected position"
+
+   It seems that spotify Seeked does not start at 0, so not sure if this is unexpected or not
+*)
+
 let () =
   Lwt_main.run
-    (let rec run () =
-       (* NOTE: recursive loop technique from https://stackoverflow.com/a/40695385/28633986 *)
-       (* TODO: this sleep doesn't actually block output *)
-       let* () = Lwt_unix.sleep 1.0 in
-       run ()
-     in
-     let* bus = OBus_bus.session () in
+    (let* bus = OBus_bus.session () in
      let proxy = spotify_proxy bus in
+
      let* metadata = metadata_init proxy in
      let* volume = volume_init proxy in
      let* pbs = playback_status_init proxy in
-     let* position = position_init proxy in
-     (* let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in *)
+     let* position, position_set = position_init proxy in
+     let* rate = rate_init proxy in
+
+     let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in
      (* up cursor, erase whole line *)
      let metadata_s : string React.signal =
        Lwt_react.S.map pr_metadata metadata
@@ -128,9 +153,36 @@ let () =
      let volume_s : string React.signal = Lwt_react.S.map pr_volume volume in
      let pbs_s = Lwt_react.S.map pr_playback_status pbs in
      let position_s = Lwt_react.S.l2 pr_position position metadata in
+
+     (* TODO: Can I just make a full format function that works (up to l6)? *)
      let state_s =
-       Lwt_react.S.merge ( ^ ) ""
-         [ (* erase_s;  *) metadata_s; volume_s; pbs_s; position_s ]
+       Lwt_react.S.merge ( ^ ) "" [ metadata_s; volume_s; pbs_s; position_s ]
      in
      let _ = Lwt_react.S.map Lwt_io.printl state_s in
-     run ())
+
+     (* let update_position pos setter = *)
+     (*   let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in *)
+     (*   (\* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *\) *)
+     (*   let _ = setter new_pos in *)
+     (*   Lwt.return_unit *)
+     (* in *)
+     (* in *)
+     (* let pbs_cond = function *)
+     (*   | Paused | Stopped -> Lwt_io.printf "PlaybackStatus is Paused or Stopped" *)
+     (*   | Playing -> update_position position position_set *)
+     (* in *)
+     (* let _ = Lwt_react.S.map pbs_cond pbs in *)
+     let rec update_loop () =
+       (* NOTE: recursive loop technique from https://stackoverflow.com/a/40695385/28633986 *)
+       (* let _ = update_position position position_set in *)
+       let new_pos = Int64.add (Lwt_react.S.value position) 1_000_000L in
+       (* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *)
+       let _ = position_set new_pos in
+       (* (\* TODO: Handle when Rate = 0 *\) *)
+       let sleep_dur = 1. /. Lwt_react.S.value rate in
+
+       (* NOTE: Does not with if `let _` *)
+       let* () = Lwt_unix.sleep sleep_dur in
+       update_loop ()
+     in
+     update_loop ())
