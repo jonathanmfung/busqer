@@ -23,8 +23,6 @@ let volume_init proxy : float Lwt_react.signal Lwt.t =
   (* let e = Lwt_react.S.changes volume_monitor in *)
   Lwt.return volume_monitor
 
-(* TODO: create type for PlaybackStatus *)
-
 type playback_status_t = Playing | Paused | Stopped
 
 let playback_status_of_string = function
@@ -52,14 +50,6 @@ let rate_init proxy =
       (Spotify_dbus__Spotify_client.Org_mpris_MediaPlayer2_Player.rate proxy)
   in
   Lwt.return rate_monitor
-
-(* TODO: Need a way to update position signal (NOT OBus signal)
-   This needs to tick every 1 second (x rate):
-   Lwt_react.S.map +1e6 position_s
-   which I guess top level `run` in main does, but feels too decoupled (rate update vs ui update)
-   (don't see how `Lwt_unix.sleep 1.0` would be modified at runtime, if rate changes;
-   arg could be rate instead of a literal)
-*)
 
 let position_init proxy =
   let* init_pos =
@@ -93,7 +83,6 @@ let microsecond_to_minsec (ms : int64) =
   let s = Int64.rem secs 60L in
   Format.sprintf "%1Li:%02Li" m s
 
-(* TODO: pr_position requires both position and metadata.length *)
 let pr_position pos md =
   let length = List.assoc_opt "mpris:length" md in
   (* NOTE: For some reason OBus thinks this is a uint64, but the spec says it is signed *)
@@ -118,12 +107,7 @@ let pr_metadata_artUrl md : unit Lwt.t =
   let v'' = Option.value v' ~default:"NOT FOUND" in
   Lwt_io.printf "mpris:artUrl: %s\n" v''
 
-(* TODO: position is taken from Position property
-   Position is not monitorable, need to use Rate property to manually step position
-   track length is from Metadata mpris:length
-   listen to Seeked signal to also update position
-     (This also needs PlaybackStatus property)
-*)
+(* TODO: listen to Seeked signal to update position *)
 
 (* TODO: How to update position_val when next track?
    Check if position_val is greater than length? How to ensure that length always refers to current track? and not next
@@ -160,25 +144,22 @@ let () =
      in
      let _ = Lwt_react.S.map Lwt_io.printl state_s in
 
-     (* let update_position pos setter = *)
-     (*   let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in *)
-     (*   (\* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *\) *)
-     (*   let _ = setter new_pos in *)
-     (*   Lwt.return_unit *)
-     (* in *)
-     (* in *)
-     (* let pbs_cond = function *)
-     (*   | Paused | Stopped -> Lwt_io.printf "PlaybackStatus is Paused or Stopped" *)
-     (*   | Playing -> update_position position position_set *)
-     (* in *)
-     (* let _ = Lwt_react.S.map pbs_cond pbs in *)
-     let rec update_loop () =
-       (* NOTE: recursive loop technique from https://stackoverflow.com/a/40695385/28633986 *)
-       (* let _ = update_position position position_set in *)
-       let new_pos = Int64.add (Lwt_react.S.value position) 1_000_000L in
+     let update_position pos setter =
+       let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in
        (* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *)
-       let _ = position_set new_pos in
-       (* (\* TODO: Handle when Rate = 0 *\) *)
+       let () = setter new_pos in
+       Lwt.return_unit
+     in
+     (* in *)
+     let pbs_cond = function
+       | Paused | Stopped -> Lwt.return_unit
+       | Playing -> update_position position position_set
+     in
+     (* NOTE: recursive loop technique from https://stackoverflow.com/a/40695385/28633986 *)
+     let rec update_loop () =
+       let* () = pbs_cond (Lwt_react.S.value pbs) in
+
+       (* TODO: Handle when Rate = 0 *)
        let sleep_dur = 1. /. Lwt_react.S.value rate in
 
        (* NOTE: Does not with if `let _` *)
