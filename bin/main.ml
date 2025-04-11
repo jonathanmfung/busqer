@@ -134,23 +134,26 @@ open Bogue
 module W = Widget
 module L = Layout
 
-let bogue_test () =
+(* let () = cli () *)
+
+let () =
   let input = W.text_input ~max_size:200 ~prompt:"Enter your name" () in
   let label = W.label ~size:40 "Hello!" in
   let layout =
     L.tower [ L.resident ~w:400 input; L.resident ~w:400 ~h:200 label ]
   in
+  let event, event_set = Lwt_react.S.create 0 in
 
   let before_display () =
-    let text = W.get_text input in
-    W.set_text label ("Hello " ^ text ^ "!")
+    Lwt_main.run
+      (let () = event_set (Lwt_react.S.value event + 1) in
+       let* () = Lwt_unix.sleep 1.0 in
+       let text = W.get_text input in
+       Lwt.return
+       @@ W.set_text label
+            ("Hello " ^ (Int.to_string @@ Lwt_react.S.value event) ^ text ^ "!"))
   in
 
   let board = Bogue.make [] [ layout ] in
-  Bogue.run ~before_display board
-
-(* let () = cli () *)
-
-let () =
-  bogue_test ();
+  Bogue.run ~before_display board;
   Draw.quit ()
