@@ -133,27 +133,47 @@ let cli () =
 open Bogue
 module W = Widget
 module L = Layout
+module T = Trigger
+
+let gui () =
+  (* Bogue Example 15 *)
+  (* This works by attatching an infinite loop to the widget.
+     The infinite loop is activated on the startup trigger event
+     The connections are such that the source and target are the same, but the `clock` action only cares about the source. The target is just a necessary dummy paramter.
+  *)
+  let clock_with_prefix prefix w_source _ ev =
+    let signal, signal_set = Lwt_react.S.create 0 in
+    let prev = ref @@ Unix.gettimeofday () in
+    let _ = Lwt_react.S.map (Format.printf "%i") signal in
+
+    let set_w_source s =
+      Label.set (W.get_label w_source) (prefix ^ Format.sprintf "%i" s)
+    in
+    let _ = Lwt_react.S.map set_w_source signal in
+
+    let rec loop () =
+      let now = Unix.gettimeofday () in
+      if now -. !prev > 1.0 then (
+        prev := now;
+        signal_set (succ @@ Lwt_react.S.value signal));
+      W.update w_source;
+      Thread.delay 0.25;
+      if T.should_exit ev then (
+        print_endline "Stopping Clock";
+        T.will_exit ev)
+      else loop ()
+    in
+    print_endline "Starting new clock";
+    loop ()
+  in
+  let clock = clock_with_prefix "Test: " in
+  let l = W.label ~size:40 "Autostarts" in
+  let c = W.connect l l clock [ T.startup ] in
+  let lay = L.flat_of_w [ l ] in
+  let board = Bogue.make [ c ] [ lay ] in
+  Bogue.run board;
+  Draw.quit ()
+
 
 (* let () = cli () *)
-
-let () =
-  let input = W.text_input ~max_size:200 ~prompt:"Enter your name" () in
-  let label = W.label ~size:40 "Hello!" in
-  let layout =
-    L.tower [ L.resident ~w:400 input; L.resident ~w:400 ~h:200 label ]
-  in
-  let event, event_set = Lwt_react.S.create 0 in
-
-  let before_display () =
-    Lwt_main.run
-      (let () = event_set (Lwt_react.S.value event + 1) in
-       let* () = Lwt_unix.sleep 1.0 in
-       let text = W.get_text input in
-       Lwt.return
-       @@ W.set_text label
-            ("Hello " ^ (Int.to_string @@ Lwt_react.S.value event) ^ text ^ "!"))
-  in
-
-  let board = Bogue.make [] [ layout ] in
-  Bogue.run ~before_display board;
-  Draw.quit ()
+let () = gui ()
