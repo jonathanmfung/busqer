@@ -1,6 +1,9 @@
 #+begin_src bash
 opam install obus
 opam install bogue
+
+opam install lablgtk
+opam install lwt_glib
 #+end_src
 
 #+begin_src bash

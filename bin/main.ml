@@ -130,50 +130,170 @@ let cli () =
      in
      update_loop ())
 
-open Bogue
-module W = Widget
-module L = Layout
-module T = Trigger
+(* open Bogue *)
+(* module W = Widget *)
+(* module L = Layout *)
+(* module T = Trigger *)
 
-let gui () =
-  (* Bogue Example 15 *)
-  (* This works by attatching an infinite loop to the widget.
-     The infinite loop is activated on the startup trigger event
-     The connections are such that the source and target are the same, but the `clock` action only cares about the source. The target is just a necessary dummy paramter.
-  *)
-  let clock_with_prefix prefix w_source _ ev =
-    let signal, signal_set = Lwt_react.S.create 0 in
-    let prev = ref @@ Unix.gettimeofday () in
-    let _ = Lwt_react.S.map (Format.printf "%i") signal in
+(* let clock_with_prefix prefix w_source _ ev = *)
+(*   let signal, signal_set = Lwt_react.S.create 0 in *)
+(*   let prev = ref @@ Unix.gettimeofday () in *)
+(*   let _ = Lwt_react.S.map (Format.printf "%i") signal in *)
 
-    let set_w_source s =
-      Label.set (W.get_label w_source) (prefix ^ Format.sprintf "%i" s)
-    in
-    let _ = Lwt_react.S.map set_w_source signal in
+(*   let set_w_source s = *)
+(*     Label.set (W.get_label w_source) (prefix ^ Format.sprintf "%i" s) *)
+(*   in *)
+(*   let _ = Lwt_react.S.map set_w_source signal in *)
 
-    let rec loop () =
-      let now = Unix.gettimeofday () in
-      if now -. !prev > 1.0 then (
-        prev := now;
-        signal_set (succ @@ Lwt_react.S.value signal));
-      W.update w_source;
-      Thread.delay 0.25;
-      if T.should_exit ev then (
-        print_endline "Stopping Clock";
-        T.will_exit ev)
-      else loop ()
-    in
-    print_endline "Starting new clock";
-    loop ()
-  in
-  let clock = clock_with_prefix "Test: " in
-  let l = W.label ~size:40 "Autostarts" in
-  let c = W.connect l l clock [ T.startup ] in
-  let lay = L.flat_of_w [ l ] in
-  let board = Bogue.make [ c ] [ lay ] in
-  Bogue.run board;
-  Draw.quit ()
+(*   let rec loop () = *)
+(*     let now = Unix.gettimeofday () in *)
+(*     if now -. !prev > 1.0 then ( *)
+(*       prev := now; *)
+(*       signal_set (succ @@ Lwt_react.S.value signal)); *)
+(*     W.update w_source; *)
+(*     Thread.delay 0.25; *)
+(*     if T.should_exit ev then ( *)
+(*       print_endline "Stopping Clock"; *)
+(*       T.will_exit ev) *)
+(*     else loop () *)
+(*   in *)
+(*   print_endline "Starting new clock"; *)
+(*   loop () *)
 
+(* let state_action state w_source _ ev = *)
+(*   let _ = *)
+(*     Lwt_react.S.map *)
+(*       (fun x -> Lwt_io.printf "%s" @@ Spotify_dbus.State.S.to_string x) *)
+(*       state *)
+(*   in *)
+
+(*   let set_w_source st = *)
+(*     Label.set (W.get_label w_source) (Spotify_dbus.State.S.to_string st) *)
+(*   in *)
+(*   let _ = Lwt_react.S.map set_w_source state in *)
+
+(*   let rec loop () = *)
+(*     W.update w_source; *)
+(*     Thread.delay 0.25; *)
+(*     if T.should_exit ev then ( *)
+(*       print_endline "Stopping Clock"; *)
+(*       T.will_exit ev) *)
+(*     else loop () *)
+(*   in *)
+(*   print_endline "Starting new Clock"; *)
+(*   loop () *)
+
+(* let foo state _ _ ev = *)
+(*   let _ = *)
+(*     Lwt_react.S.map *)
+(*       (fun x -> Lwt_io.printf "%s\n" @@ Spotify_dbus.State.S.to_string x) *)
+(*       state *)
+(*   in *)
+
+(*   let rec loop () = *)
+(*     Thread.delay 0.25; *)
+(*     if T.should_exit ev then ( *)
+(*       print_endline "Stopping Clock"; *)
+(*       T.will_exit ev) *)
+(*     else loop () *)
+(*   in *)
+(*   print_endline "Starting new Clock"; *)
+(*   loop () *)
+
+(* let gui () = *)
+(*   (\* Bogue Example 15 *\) *)
+(*   (\* This works by attatching an infinite loop to the widget. *)
+(*      The infinite loop (action arg) is activated on the startup trigger event *)
+(*      The connections are such that the source and target are the same, but the `clock` action only cares about the source. The target is just a necessary dummy paramter. *)
+(*   *\) *)
+(*   Lwt_main.run *)
+(*     (let* bus = OBus_bus.session () in *)
+(*      let proxy = spotify_proxy bus in *)
+
+(*      let* metadata = metadata_init proxy in *)
+(*      let* volume = volume_init proxy in *)
+(*      let* pbs = playback_status_init proxy in *)
+(*      let* position, position_set = position_init proxy in *)
+(*      let* rate = rate_init proxy in *)
+(*      let* seeked_signal = seeked_init proxy in *)
+
+(*      (\* up cursor, erase whole line *\) *)
+(*      let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in *)
+
+(*      let state = *)
+(*        Lwt_react.S.l5 Spotify_dbus.State.S.make metadata volume pbs position *)
+(*          rate *)
+(*      in *)
+
+(*      let _ = *)
+(*        Lwt_react.S.map *)
+(*          (fun x -> *)
+(*            Lwt_io.printf "in main: %s\n" @@ Spotify_dbus.State.S.to_string x) *)
+(*          state *)
+(*      in *)
+
+(*      let clock = clock_with_prefix "Test: " in *)
+(*      let l = W.label ~size:20 "Autostarts" in *)
+(*      let c = W.connect l l (foo state) [ T.startup ] in *)
+(*      let lay = L.flat_of_w [ l ] in *)
+(*      let board = Bogue.make [ c ] [ lay ] in *)
+(*      let* () = Lwt.return @@ Bogue.run board in *)
+(*      Lwt.return @@ Draw.quit ()) *)
 
 (* let () = cli () *)
-let () = gui ()
+(* let () = gui () *)
+
+(* let foo s = *)
+(*   Lwt_react.S.map (Lwt_io.printf "%i") s *)
+
+(* let () = *)
+(*   Lwt_main.run *)
+(*     (let signal, set = Lwt_react.S.create 0 in *)
+(*      let _ = foo signal in *)
+(*      (\* let _ = Lwt_react.S.map (Lwt_io.printf "%i") signal in *\) *)
+(*      let rec update_loop () = *)
+(*        let () = set (succ @@ Lwt_react.S.value signal) in *)
+(*        let* () = Lwt_unix.sleep 0.5 in *)
+(*        update_loop (); *)
+(*      in *)
+(*      update_loop ()) *)
+
+let () =
+  Lwt_main.run
+    ((* Initializes GTK. *)
+     ignore (GMain.init ());
+
+     (* Install Lwt<->Glib integration. *)
+     Lwt_glib.install ();
+
+     (* Thread which is wakeup when the main window is closed. *)
+     let waiter, wakener = Lwt.wait () in
+
+     (* Create a window. *)
+     let window = GWindow.window () in
+
+     (* Display something inside the window. *)
+     let lab = GMisc.label ~text:"Hello, world!" ~packing:window#add () in
+
+     (* Quit when the window is closed. *)
+     ignore (window#connect#destroy (Lwt.wakeup_later wakener));
+
+     (* Show the window. *)
+     window#show ();
+
+     let signal, set = Lwt_react.S.create 0 in
+     let _ =
+       Lwt_react.S.map (fun i -> lab#set_text @@ Int.to_string i) signal
+     in
+
+     let _ = Lwt_react.S.map (Lwt_io.printf "%i") signal in
+
+     let rec update_loop () =
+       let () = set (succ @@ Lwt_react.S.value signal) in
+       let* () = Lwt_unix.sleep 0.5 in
+       match Lwt.state waiter with
+       | Lwt.Return v -> waiter
+       | Lwt.Fail exn -> waiter
+       | Lwt.Sleep -> update_loop ()
+     in
+     update_loop ())

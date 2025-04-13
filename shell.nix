@@ -16,6 +16,10 @@ pkgs.mkShell {
     SDL2
     SDL2_image
     SDL2_ttf
+
+    # GTK
+    glib
+    gtk2
   ];
   packages = with pkgs; [
     opam
@@ -26,5 +30,6 @@ pkgs.mkShell {
     # ocamlPackages.odoc
     ocamlPackages.ocaml-lsp
     ocamlformat
+    ocamlPackages.lablgtk # Version 2.18
   ];
 }

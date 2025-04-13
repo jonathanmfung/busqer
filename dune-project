@@ -22,7 +22,9 @@
  (depends ocaml dune
   obus
   utop
-  bogue)
+  bogue
+  lablgtk
+  lwt_glib)
  (tags
   (topics "to describe" your project)))
 
