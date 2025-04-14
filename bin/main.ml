@@ -89,7 +89,7 @@ let cli () =
      let* seeked_signal = seeked_init proxy in
 
      (* up cursor, erase whole line *)
-     let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in
+     let erase = "\o033[A\o033[2K" in
 
      let state =
        Lwt_react.S.l5 Spotify_dbus.State.S.make metadata volume pbs position
@@ -100,7 +100,7 @@ let cli () =
      let _ = Lwt_react.E.map position_set seeked_signal in
      let _ =
        Lwt_react.S.map
-         (fun x -> Lwt_io.printl @@ Spotify_dbus.State.S.to_string x)
+         (fun x -> Lwt_io.printl @@ erase ^ Spotify_dbus.State.S.to_string x)
          state
      in
 
@@ -163,9 +163,6 @@ let gui () =
      let* rate = rate_init proxy in
      let* seeked_signal = seeked_init proxy in
 
-     (* up cursor, erase whole line *)
-     let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in
-
      let state =
        Lwt_react.S.l5 Spotify_dbus.State.S.make metadata volume pbs position
          rate
@@ -209,5 +206,5 @@ let gui () =
      in
      update_loop ())
 
-(* let () = cli () *)
-let () = gui ()
+let () = cli ()
+(* let () = gui () *)
