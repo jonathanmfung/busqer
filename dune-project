@@ -22,7 +22,6 @@
  (depends ocaml dune
   obus
   utop
-  bogue
   lablgtk
   lwt_glib)
  (tags

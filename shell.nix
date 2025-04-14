@@ -11,12 +11,6 @@ pkgs.mkShell {
   buildInputs = with pkgs; [
     pkg-config
 
-    # Deps for bogue
-    libffi
-    SDL2
-    SDL2_image
-    SDL2_ttf
-
     # GTK
     glib
     gtk2
