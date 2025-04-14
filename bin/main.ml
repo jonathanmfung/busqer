@@ -243,21 +243,6 @@ let cli () =
 (* let () = cli () *)
 (* let () = gui () *)
 
-(* let foo s = *)
-(*   Lwt_react.S.map (Lwt_io.printf "%i") s *)
-
-(* let () = *)
-(*   Lwt_main.run *)
-(*     (let signal, set = Lwt_react.S.create 0 in *)
-(*      let _ = foo signal in *)
-(*      (\* let _ = Lwt_react.S.map (Lwt_io.printf "%i") signal in *\) *)
-(*      let rec update_loop () = *)
-(*        let () = set (succ @@ Lwt_react.S.value signal) in *)
-(*        let* () = Lwt_unix.sleep 0.5 in *)
-(*        update_loop (); *)
-(*      in *)
-(*      update_loop ()) *)
-
 let () =
   Lwt_main.run
     ((* Initializes GTK. *)
@@ -281,16 +266,55 @@ let () =
      (* Show the window. *)
      window#show ();
 
-     let signal, set = Lwt_react.S.create 0 in
-     let _ =
-       Lwt_react.S.map (fun i -> lab#set_text @@ Int.to_string i) signal
+     let* bus = OBus_bus.session () in
+     let proxy = spotify_proxy bus in
+
+     let* metadata = metadata_init proxy in
+     let* volume = volume_init proxy in
+     let* pbs = playback_status_init proxy in
+     let* position, position_set = position_init proxy in
+     let* rate = rate_init proxy in
+     let* seeked_signal = seeked_init proxy in
+
+     (* up cursor, erase whole line *)
+     let erase_s = Lwt_react.S.const "\o033[A\o033[2K" in
+
+     let state =
+       Lwt_react.S.l5 Spotify_dbus.State.S.make metadata volume pbs position
+         rate
      in
 
-     let _ = Lwt_react.S.map (Lwt_io.printf "%i") signal in
+     (* Attach Actions *)
+     let _ = Lwt_react.E.map position_set seeked_signal in
 
+     let _ =
+       Lwt_react.S.map
+         (fun s -> lab#set_text @@ Spotify_dbus.State.S.to_string s)
+         state
+     in
+
+     let update_position pos setter =
+       (* TODO: change 1m to be calculated from rate *)
+       let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in
+       (* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *)
+       let () = setter new_pos in
+       Lwt.return_unit
+     in
+     (* NOTE: recursive loop technique from https://stackoverflow.com/a/40695385/28633986 *)
      let rec update_loop () =
-       let () = set (succ @@ Lwt_react.S.value signal) in
-       let* () = Lwt_unix.sleep 0.5 in
+       let* () =
+         (* TODO: get from state *)
+         Spotify_dbus.State.if_playing
+           (Spotify_dbus.State.playback_status_of_string
+          @@ Lwt_react.S.value pbs)
+           (fun () -> update_position position position_set)
+       in
+
+       (* TODO: Handle when Rate = 0 *)
+       let sleep_dur = 1. /. Lwt_react.S.value rate in
+
+       (* NOTE: Does not with if `let _` *)
+       let* () = Lwt_unix.sleep sleep_dur in
        match Lwt.state waiter with
        | Lwt.Return v -> waiter
        | Lwt.Fail exn -> waiter
