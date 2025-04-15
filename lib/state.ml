@@ -50,14 +50,15 @@ end = struct
 
   let artist t =
     let artist = List.assoc_opt "xesam:artist" t.metadata in
-    (* TODO: Convert single_list.t to string with delims, no braces, no quotes  *)
-    let artist' = Option.map OBus_value.V.string_of_single artist in
-    Option.value artist' ~default:"NOT FOUND"
+    let artist' =
+      Option.map OBus_value.(C.cast_single @@ C.array C.basic_string) artist
+    in
+    let artist'' = Option.map (String.concat ", ") artist' in
+    Option.value artist'' ~default:"NOT FOUND"
 
   let title t =
-    (* TODO: non-ascii (single quotes, symbols, hangul) are some backslash-escaped numbers *)
     let title = List.assoc_opt "xesam:title" t.metadata in
-    let title' = Option.map OBus_value.V.string_of_single title in
+    let title' = Option.map OBus_value.(C.cast_single C.basic_string) title in
     Option.value title' ~default:"NOT FOUND"
 
   let microsecond_to_minsec (ms : int64) =
@@ -68,10 +69,9 @@ end = struct
 
   let to_string t =
     let length = List.assoc_opt "mpris:length" t.metadata in
-    (* NOTE: For some reason OBus thinks this is a uint64, but the spec says it is signed *)
-    let length' =
-      Option.map (OBus_value.C.cast_single OBus_value.C.basic_uint64) length
-    in
+    (* NOTE: For some reason OBus thinks this is a uint64, but the spec says it is signed
+       Even `dbus-send` says this is uint64 *)
+    let length' = Option.map OBus_value.(C.cast_single C.basic_uint64) length in
     let length'' = Option.value length' ~default:0L in
     Format.sprintf "%s - %s, Volume: %5.1f, Status: %7s, %s/%s, (x%3.1f)"
       (artist t) (title t) (100. *. t.volume)
