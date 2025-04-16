@@ -225,8 +225,7 @@ let () = gui ()
 
  *)
 
-(* TODO: Install http-lwt-client
-   TODO: Figure out how to convert Response to pixbuf/JPEG
+(* TODO: Figure out how to convert Response to pixbuf/JPEG
          Save Response to File, then use GdkPixbuf.from_file
          (pixbuf has more options to inspect pixels `get_pixels`)
    TODO: Install xdg
