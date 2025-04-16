@@ -6,8 +6,7 @@ let spotify_proxy bus =
       (OBus_peer.make ~connection:bus ~name:"org.mpris.MediaPlayer2.spotify")
     ~path:[ "org"; "mpris"; "MediaPlayer2" ]
 
-let metadata_init
-    proxy =
+let metadata_init proxy =
   let* metadata_monitor =
     OBus_property.monitor
       (Spotify_dbus.Spotify_client.Org_mpris_MediaPlayer2_Player.metadata proxy)
@@ -50,19 +49,6 @@ let seeked_init proxy =
       (Spotify_dbus.Spotify_client.Org_mpris_MediaPlayer2_Player.seeked proxy)
   in
   Lwt.return seeked_signal
-
-(* *** *)
-
-let pr_metadata_full md : unit Lwt.t =
-  Lwt_list.iter_p
-    (fun (k, v) -> Lwt_io.printf "%s: %s\n" k (OBus_value.V.string_of_single v))
-    md
-
-let pr_metadata_artUrl md : unit Lwt.t =
-  let v = List.assoc_opt "mpris:artUrl" md in
-  let v' = Option.map OBus_value.V.string_of_single v in
-  let v'' = Option.value v' ~default:"NOT FOUND" in
-  Lwt_io.printf "mpris:artUrl: %s\n" v''
 
 (* NOTE: How to update position_val when next track?
    Check if position_val is greater than length? How to ensure that length always refers to current track? and not next
@@ -145,7 +131,10 @@ let gui () =
      let window = GWindow.window () in
 
      (* Display something inside the window. *)
-     let lab = GMisc.label ~text:"Hello, world!" ~packing:window#add () in
+     (* https://github.com/garrigue/lablgtk/blob/lablgtk3/examples/stackcontainer.ml *)
+     let vbox = GPack.vbox ~packing:window#add () in
+
+     let lab = GMisc.label ~text:"Hello, world!" ~packing:vbox#pack () in
 
      (* Quit when the window is closed. *)
      ignore (window#connect#destroy (Lwt.wakeup_later wakener));
@@ -170,15 +159,43 @@ let gui () =
          rate
      in
 
-     (* Attach Actions *)
+     (* * Attach Actions * *)
+
+     (* Seek Position *)
      let _ = Lwt_react.E.map position_set seeked_signal in
 
+     (* Update UI *)
      let _ =
        Lwt_react.S.map
          (fun s -> lab#set_text @@ Spotify_dbus.State.S.to_string s)
          state
      in
 
+     (* Update Album Art *)
+     let pb_init = GdkPixbuf.create ~width:1 ~height:1 () in
+     let img = GMisc.image ~pixbuf:pb_init ~packing:vbox#add () in
+
+     (* TODO: this takes from cache and dumps every single state update
+        Probably want similar logic as update_position being inside update_loop
+        Seek is probably a good signal since it can be a track skip
+
+        or maybe can split up steps so dump only reacts to if au value has changed
+     *)
+     let _ =
+       Lwt_react.S.map
+         Spotify_dbus.(
+           fun s ->
+             let ( let* ) = Lwt_result.bind in
+             let* au = ArtUrl.A.from_url @@ State.S.art_url s in
+             let* () =
+               Lwt_result.map_error (fun e -> [ e ]) @@ ArtUrl.A.to_cache au
+             in
+             let pb = GdkPixbuf.from_file @@ ArtUrl.A.abs_path au in
+             Lwt_result.return @@ img#set_pixbuf pb)
+         state
+     in
+
+     (* Update Position *)
      let update_position pos setter =
        (* TODO: change 1m to be calculated from rate *)
        let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in
@@ -215,19 +232,8 @@ let gui () =
 (* let () = cli () *)
 let () = gui ()
 
-(* TODO: artUrl and displaying images:
-  https://i.scdn.co/image/ab67616d0000b27325f8b0dfb1d5619234098cad
-  data is a JPEG image data, JFIF standard 1.01, resolution (DPI),
-  density 72x72, segment length 16, baseline, precision 8, 640x640, components 3
 
-  Probably `GMisc.image` on a pixbuf? Or file so there can be a cache.
-  Then file would be in XDG_CACHE_HOME (https://github.com/ocaml/dune/blob/main/otherlibs/xdg/xdg.mli)
-
- *)
-
-(* TODO: Figure out how to convert Response to pixbuf/JPEG
-         Save Response to File, then use GdkPixbuf.from_file
-         (pixbuf has more options to inspect pixels `get_pixels`)
+(* TODO: pixbuf has more options to inspect pixels `get_pixels`
    TODO: Install xdg
 *)
 

@@ -1,18 +1,18 @@
 module type FILECACHE = sig
+  type key_t = string
   type t
-  type key
 
   val dump : t -> (unit, exn) Lwt_result.t
-  val from : key -> (string, exn) Lwt_result.t
+  val from : key_t -> (string, exn) Lwt_result.t
+  val abs_path : key_t -> string
 end
 
 module type FILESERIALIZETYPE = sig
-  type v
-  type key
+  type key_t = string
+  type t = { key : key_t; data : string }
 
-  val key : v -> key
-  val filename : key -> string
-  val to_data : v -> string
+  val of_key : key_t -> t
+  val filename : key_t -> string
 end
 
 module type CONFIGTYPE = sig
@@ -20,9 +20,8 @@ module type CONFIGTYPE = sig
 end
 
 module Make (C : CONFIGTYPE) (Fs : FILESERIALIZETYPE) :
-  FILECACHE with type t = Fs.v with type key = Fs.key = struct
-  type t = Fs.v
-  type key = Fs.key
+  FILECACHE with type t = Fs.t = struct
+  include Fs
 
   let abs_path k = Filename.concat C.cache_dir (Fs.filename k)
 
@@ -32,8 +31,10 @@ module Make (C : CONFIGTYPE) (Fs : FILESERIALIZETYPE) :
   (* TODO: Make absoulte path *)
   let dump t =
     cache_dir_ensure C.cache_dir;
-    let fname = abs_path (Fs.key t) in
-    let f ch = Lwt_io.write ch (Fs.to_data t) in
+    let fname = abs_path t.key in
+    let f ch = Lwt_io.write ch t.data in
+    let ( let* ) = Lwt.bind in
+    let* () = Log.err "FILECACHE Dumped to %s" fname in
     Lwt_result.catch @@ fun () -> Lwt_io.with_file ~mode:Lwt_io.Output fname f
 
   let from k =
@@ -42,18 +43,3 @@ module Make (C : CONFIGTYPE) (Fs : FILESERIALIZETYPE) :
     let f ch = Lwt_io.read ch in
     Lwt_result.catch @@ fun () -> Lwt_io.with_file ~mode:Lwt_io.input fname f
 end
-
-module StringCache =
-  (* TODO: Just for testing *)
-    Make
-      (struct
-      let cache_dir = "/home/jonat/.cache/spotify_dbus"
-    end)
-    (struct
-      type v = string
-      type key = string
-
-      let key t = String.uppercase_ascii t
-      let filename k = k ^ "_filename.txt"
-      let to_data t = "DATA: " ^ String.lowercase_ascii t
-    end)

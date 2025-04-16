@@ -16,6 +16,11 @@ let if_playing playback_status f =
   | Paused | Stopped -> Lwt.return_unit
   | Playing -> f ()
 
+let pr_metadata_full md : unit Lwt.t =
+  Lwt_list.iter_p
+    (fun (k, v) -> Lwt_io.printf "%s: %s\n" k (OBus_value.V.string_of_single v))
+    md
+
 module S : sig
   type t
   type metadata_t = (string * OBus_value.V.single) list
@@ -25,6 +30,7 @@ module S : sig
 
   val make : metadata_t -> volume_t -> string -> position_t -> rate_t -> t
   val to_string : t -> string
+  val art_url : t -> string
 end = struct
   type metadata_t = (string * OBus_value.V.single) list
   type volume_t = float
@@ -48,6 +54,7 @@ end = struct
       rate;
     }
 
+  (* TODO: Consider making these stay in option and not default *)
   let artist t =
     let artist = List.assoc_opt "xesam:artist" t.metadata in
     let artist' =
@@ -60,6 +67,11 @@ end = struct
     let title = List.assoc_opt "xesam:title" t.metadata in
     let title' = Option.map OBus_value.(C.cast_single C.basic_string) title in
     Option.value title' ~default:"NOT FOUND"
+
+  let art_url t =
+    let au = List.assoc_opt "mpris:artUrl" t.metadata in
+    let au' = Option.map OBus_value.(C.cast_single C.basic_string) au in
+    Option.value au' ~default:"NOT FOUND"
 
   let microsecond_to_minsec (ms : int64) =
     let secs = Int64.div ms 1_000_000L in

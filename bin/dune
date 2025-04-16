@@ -2,5 +2,13 @@
  (public_name spotify_dbus)
  (name main)
  (libraries spotify_dbus lwt_glib lablgtk2)
- (flags (:standard -w -unused-value-declaration -w -unused-var-strict -w -unused-var
-                   -w -labels-omitted)))
+ (flags
+  (:standard
+   -w
+   -unused-value-declaration
+   -w
+   -unused-var-strict
+   -w
+   -unused-var
+   -w
+   -labels-omitted)))
