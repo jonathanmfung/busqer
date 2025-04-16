@@ -7,12 +7,11 @@ let spotify_proxy bus =
     ~path:[ "org"; "mpris"; "MediaPlayer2" ]
 
 let metadata_init
-    proxy (* : (string * OBus_value.V.single) list React.event Lwt.t *) =
+    proxy =
   let* metadata_monitor =
     OBus_property.monitor
       (Spotify_dbus.Spotify_client.Org_mpris_MediaPlayer2_Player.metadata proxy)
   in
-  (* let e = Lwt_react.S.changes metadata_monitor in *)
   Lwt.return metadata_monitor
 
 let volume_init proxy : float Lwt_react.signal Lwt.t =
@@ -20,7 +19,6 @@ let volume_init proxy : float Lwt_react.signal Lwt.t =
     OBus_property.monitor
       (Spotify_dbus.Spotify_client.Org_mpris_MediaPlayer2_Player.volume proxy)
   in
-  (* let e = Lwt_react.S.changes volume_monitor in *)
   Lwt.return volume_monitor
 
 let playback_status_init proxy =
@@ -135,6 +133,8 @@ let gui () =
     ((* Initializes GTK. *)
      ignore (GMain.init ());
 
+     let* () = Spotify_dbus.Log.out "GTK Initialized" in
+
      (* Install Lwt<->Glib integration. *)
      Lwt_glib.install ();
 
@@ -162,6 +162,8 @@ let gui () =
      let* position, position_set = position_init proxy in
      let* rate = rate_init proxy in
      let* seeked_signal = seeked_init proxy in
+
+     let* () = Spotify_dbus.Log.out "OBus Initialized and connected" in
 
      let state =
        Lwt_react.S.l5 Spotify_dbus.State.S.make metadata volume pbs position
@@ -201,10 +203,34 @@ let gui () =
        let* () = Lwt_unix.sleep sleep_dur in
        match Lwt.state waiter with
        | Lwt.Return v -> waiter
-       | Lwt.Fail exn -> waiter
+       (* TODO: Handle Fail (logging) *)
+       | Lwt.Fail exn ->
+           let* () = Spotify_dbus.Log.err "Waiter Failed" in
+           waiter
        | Lwt.Sleep -> update_loop ()
      in
-     update_loop ())
+     let* () = update_loop () in
+     Spotify_dbus.Log.err "Window closed, exitting gracefully")
 
-let () = cli ()
-(* let () = gui () *)
+(* let () = cli () *)
+let () = gui ()
+
+(* TODO: artUrl and displaying images:
+  https://i.scdn.co/image/ab67616d0000b27325f8b0dfb1d5619234098cad
+  data is a JPEG image data, JFIF standard 1.01, resolution (DPI),
+  density 72x72, segment length 16, baseline, precision 8, 640x640, components 3
+
+  Probably `GMisc.image` on a pixbuf? Or file so there can be a cache.
+  Then file would be in XDG_CACHE_HOME (https://github.com/ocaml/dune/blob/main/otherlibs/xdg/xdg.mli)
+
+ *)
+
+(* TODO: Install http-lwt-client
+   TODO: Figure out how to convert Response to pixbuf/JPEG
+         Save Response to File, then use GdkPixbuf.from_file
+         (pixbuf has more options to inspect pixels `get_pixels`)
+   TODO: Install xdg
+*)
+
+(* TODO: For image processing, could look at parallel processing:
+   https://ocaml.org/manual/5.0/parallelism.html *)
