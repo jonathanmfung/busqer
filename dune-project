@@ -23,7 +23,9 @@
   obus
   utop
   lablgtk
-  lwt_glib)
+  lwt_glib
+  cohttp-lwt-unix
+  lwt_ssl)
  (tags
   (topics "to describe" your project)))
 

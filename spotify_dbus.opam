@@ -16,6 +16,8 @@ depends: [
   "utop"
   "lablgtk"
   "lwt_glib"
+  "cohttp-lwt-unix"
+  "lwt_ssl"
   "odoc" {with-doc}
 ]
 build: [

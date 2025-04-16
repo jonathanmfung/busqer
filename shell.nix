@@ -14,6 +14,9 @@ pkgs.mkShell {
     # GTK
     glib
     gtk2
+
+    # TLS for Conduit/Cohttp
+    ocamlPackages.lwt_ssl
   ];
   packages = with pkgs; [
     opam
@@ -25,5 +28,6 @@ pkgs.mkShell {
     ocamlPackages.ocaml-lsp
     ocamlformat
     ocamlPackages.lablgtk # Version 2.18
+    ocamlPackages.cohttp-lwt-unix
   ];
 }
