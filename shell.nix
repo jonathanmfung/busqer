@@ -29,5 +29,8 @@ pkgs.mkShell {
     ocamlformat
     ocamlPackages.lablgtk # Version 2.18
     ocamlPackages.cohttp-lwt-unix
+
+    # for scripts/
+    graphviz
   ];
 }
