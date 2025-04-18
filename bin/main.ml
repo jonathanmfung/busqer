@@ -229,9 +229,13 @@ let gui () =
      let* () = update_loop () in
      Spotify_dbus.Log.err "Window closed, exitting gracefully")
 
-(* let () = cli () *)
-let () = gui ()
 
+let () =
+  Printexc.record_backtrace true;
+  try gui ()
+  with e ->
+    let name, msg = OBus_error.cast e in
+    Printf.printf "DBus error (%s): %s" name msg
 
 (* TODO: pixbuf has more options to inspect pixels `get_pixels`
    TODO: Install xdg
