@@ -1,94 +1,117 @@
-type playback_status_t = Playing | Paused | Stopped
+let microsecond_to_minsec (ms : int64) =
+  let secs = Int64.div ms 1_000_000L in
+  let m = Int64.div secs 60L in
+  let s = Int64.rem secs 60L in
+  Format.sprintf "%1Li:%02Li" m s
 
-let playback_status_of_string = function
-  | "Playing" -> Playing
-  | "Paused" -> Paused
-  | "Stopped" -> Stopped
-  | _ -> failwith "playback_status_of_string: Invalid PlaybackStatus"
+type track_info = { title : string; artist : string }
 
-let playback_status_to_string = function
-  | Playing -> "Playing"
-  | Paused -> "Paused"
-  | Stopped -> "Stopped"
-
-let if_playing playback_status f =
-  match playback_status with
-  | Paused | Stopped -> Lwt.return_unit
-  | Playing -> f ()
-
-let pr_metadata_full md : unit Lwt.t =
-  Lwt_list.iter_p
-    (fun (k, v) -> Lwt_io.printf "%s: %s\n" k (OBus_value.V.string_of_single v))
-    md
-
-module S : sig
-  type t
+module Metadata : sig
+  type t = [ `TrackInfo of track_info | `Length of int64 ]
   type metadata_t = (string * OBus_value.V.single) list
-  type volume_t = float
-  type position_t = int64
-  type rate_t = float
 
-  val make : metadata_t -> volume_t -> string -> position_t -> rate_t -> t
+  (* TODO: Consider splitting up TrackInfo into Title, Artist, Album *)
+  val make_track_info : metadata_t -> [> `TrackInfo of track_info ]
+  val make_length : metadata_t -> [> `Length of int64 ]
+  val make_art_url : metadata_t -> (ArtUrl.A.t, ArtUrl.A.exns) Lwt_result.t
   val to_string : t -> string
-  val art_url : t -> string
 end = struct
   type metadata_t = (string * OBus_value.V.single) list
-  type volume_t = float
-  type position_t = int64
-  type rate_t = float
+  type t = [ `TrackInfo of track_info | `Length of int64 ]
 
-  type t = {
-    metadata : metadata_t;
-    volume : volume_t;
-    playback_status : playback_status_t;
-    position : position_t;
-    rate : rate_t;
-  }
-
-  let make metadata volume playback_status position rate =
-    {
-      metadata;
-      volume;
-      playback_status = playback_status_of_string playback_status;
-      position;
-      rate;
-    }
-
-  (* TODO: Consider making these stay in option and not default *)
-  let artist t =
-    let artist = List.assoc_opt "xesam:artist" t.metadata in
+  let artist md =
+    let artist = List.assoc_opt "xesam:artist" md in
     let artist' =
       Option.map OBus_value.(C.cast_single @@ C.array C.basic_string) artist
     in
     let artist'' = Option.map (String.concat ", ") artist' in
     Option.value artist'' ~default:"NOT FOUND"
 
-  let title t =
-    let title = List.assoc_opt "xesam:title" t.metadata in
+  let title md =
+    let title = List.assoc_opt "xesam:title" md in
     let title' = Option.map OBus_value.(C.cast_single C.basic_string) title in
     Option.value title' ~default:"NOT FOUND"
 
-  let art_url t =
-    let au = List.assoc_opt "mpris:artUrl" t.metadata in
+  let length md =
+    let length = List.assoc_opt "mpris:length" md in
+    (* NOTE: For some reason OBus thinks this is a (DBus type) uint64, but the spec says it is signed
+       Even `dbus-send` says this is uint64 *)
+    let length' = Option.map OBus_value.(C.cast_single C.basic_uint64) length in
+    Option.value length' ~default:0L
+
+  let art_url md =
+    let au = List.assoc_opt "mpris:artUrl" md in
     let au' = Option.map OBus_value.(C.cast_single C.basic_string) au in
     Option.value au' ~default:"NOT FOUND"
 
-  let microsecond_to_minsec (ms : int64) =
-    let secs = Int64.div ms 1_000_000L in
-    let m = Int64.div secs 60L in
-    let s = Int64.rem secs 60L in
-    Format.sprintf "%1Li:%02Li" m s
+  let make_track_info md = `TrackInfo { title = title md; artist = artist md }
+  let make_length md = `Length (length md)
+  let make_art_url md = ArtUrl.A.from_url @@ art_url md
 
-  let to_string t =
-    let length = List.assoc_opt "mpris:length" t.metadata in
-    (* NOTE: For some reason OBus thinks this is a uint64, but the spec says it is signed
-       Even `dbus-send` says this is uint64 *)
-    let length' = Option.map OBus_value.(C.cast_single C.basic_uint64) length in
-    let length'' = Option.value length' ~default:0L in
-    Format.sprintf "%s - %s, Volume: %5.1f, Status: %7s, %s/%s, (x%3.1f)"
-      (artist t) (title t) (100. *. t.volume)
-      (playback_status_to_string t.playback_status)
-      (microsecond_to_minsec t.position)
-      (microsecond_to_minsec length'')
-      t.rate
+  let to_string = function
+    | `TrackInfo ti -> ti.title ^ ti.artist
+    | `Length l -> microsecond_to_minsec l
+    | `ArtUrl s -> s
+end
+
+module Volume : sig
+  type t = private float
+
+  val make : float -> t
+  val to_string : t -> string
+end = struct
+  type t = float
+
+  let make f = f
+  let to_string t = Printf.sprintf "%5.1f" (100. *. t)
+end
+
+module PlaybackStatus : sig
+  type t = private Playing | Paused | Stopped
+
+  val make : string -> t
+  val to_string : t -> string
+  val if_playing : t -> (unit -> unit Lwt.t) -> unit Lwt.t
+end = struct
+  type t = Playing | Paused | Stopped
+
+  let make = function
+    | "Playing" -> Playing
+    | "Paused" -> Paused
+    | "Stopped" -> Stopped
+    | _ -> failwith "playback_status_of_string: Invalid PlaybackStatus"
+
+  let to_string = function
+    | Playing -> "Playing"
+    | Paused -> "Paused"
+    | Stopped -> "Stopped"
+
+  let if_playing playback_status f =
+    match playback_status with
+    | Paused | Stopped -> Lwt.return_unit
+    | Playing -> f ()
+end
+
+module Position : sig
+  type t = int64
+
+  val make : int64 -> t
+  val to_string : t -> string
+end = struct
+  type t = int64
+
+  let make f = f
+  let to_string = microsecond_to_minsec
+end
+
+module Rate : sig
+  type t = float
+
+  val make : float -> t
+  val to_string : t -> string
+end = struct
+  type t = float
+
+  let make f = f
+  let to_string t = Printf.sprintf "x%3.1f" t
 end

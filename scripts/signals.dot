@@ -1,29 +1,63 @@
 # dot -Tpng signals.dot > signals.png
 digraph mygraph {
   rankdir = TB;
-  node [shape=box];
 
-  # "rate" -> "state";
+  # DBus monitors
+  node [shape=box]
+  "metadata";
+  "volume";
+  "playback_status";
+  "position";
+  "rate";
+
+  # DBus signals (FRP Events)
+  node [shape=trapezium];
+  "seeked_signal";
+
+  # Derived FRP signals
+  node [shape=box, style=dashed];
+  "title/artist/album";
+  "length";
+  "art_url";
+
+  node [style=solid];
+
+  # Update effects
+  node [shape=diamond, style=dashed];
+  "_u_titleetc";
+  "_u_length";
+  "_u_album_art";
+  "_u_vol";
+  "_u_pbs";
+  "_u_pos";
+  node [style=solid];
+
+  "GTK UI" [shape=circle];
+
+  node [shape=ellipse]; # Default
+
   "metadata" -> "title/artist/album";
   "metadata" -> "length";
+  "metadata" -> "art_url";
 
-  "title/artist/album" -> "_u_titleetc"
-  "length" -> "_u_length"
+  "title/artist/album" -> "_u_titleetc";
+  "length" -> "_u_length";
   "volume" -> "_u_vol";
   "playback_status" -> "_u_pbs";
-  "init_pos" -> "position" [label="initialize"];
-  "position" -> "_u_pos";
 
+  "position" -> "_u_pos";
+  "init_pos" -> "position" [label="initialize"];
   "seeked_signal" -> "position" [label="set"];
 
-  "_u_titleetc" -> "GTK UI" [label="<w#set>"]
-  "_u_length" -> "GTK UI" [label="<w#set>"]
-  "_u_vol" -> "GTK UI" [label="<w#set>"]
-  "_u_pbs" -> "GTK UI" [label="<w#set>"]
-  "_u_pos" -> "GTK UI" [label="<w#set>"]
+  edge [label="<w#set>"];
+  "_u_titleetc" -> "GTK UI";
+  "_u_length" -> "GTK UI";
+  "_u_vol" -> "GTK UI";
+  "_u_pbs" -> "GTK UI";
+  "_u_pos" -> "GTK UI";
+  edge [label = ""]
 
-  "metadata" -> "art_url";
-  "art_url" -> "Filesystem" [label="to_cache"]
-  "art_url" -> "_u_album_art"
-  "_u_album_art" -> "GTK UI" [label="img#set_pixbuf"]
+  "art_url" -> "Filesystem" [label="to_cache"];
+  "art_url" -> "_u_album_art";
+  "_u_album_art" -> "GTK UI" [label="img#set_pixbuf"];
 }
