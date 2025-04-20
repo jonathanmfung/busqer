@@ -61,7 +61,7 @@ end = struct
             | Result.Ok y ->
                 let* () = Log.err "ArtUrl from Url Fetch" in
                 Lwt_result.return { data = y; key }
-            | Result.Error e2 -> Lwt_result.fail [ e2; e1 ]))
+            | Result.Error e2 -> failwith @@ Printexc.to_string e2 ^ "\n" ^ Printexc.to_string e1))
 
   let to_cache t =
     (* TODO: Consider not dumping if file already exists *)
