@@ -18,6 +18,7 @@ depends: [
   "lwt_glib"
   "cohttp-lwt-unix"
   "lwt_ssl"
+  "ounit2"
   "odoc" {with-doc}
 ]
 build: [

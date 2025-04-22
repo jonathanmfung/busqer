@@ -17,6 +17,9 @@ pkgs.mkShell {
 
     # TLS for Conduit/Cohttp
     ocamlPackages.lwt_ssl
+
+    # OUnit
+    ocamlPackages.ounit
   ];
   packages = with pkgs; [
     opam

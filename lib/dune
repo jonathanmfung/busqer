@@ -2,4 +2,4 @@
 
 (library
  (name spotify_dbus)
- (libraries obus cohttp-lwt-unix))
+ (libraries obus cohttp-lwt-unix lablgtk2))

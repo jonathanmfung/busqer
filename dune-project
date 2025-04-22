@@ -25,7 +25,8 @@
   lablgtk
   lwt_glib
   cohttp-lwt-unix
-  lwt_ssl)
+  lwt_ssl
+  ounit2)
  (tags
   (topics "to describe" your project)))
 

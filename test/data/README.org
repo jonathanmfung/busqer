@@ -1,0 +1,7 @@
+#+begin_src bash :results none
+curl https://i.scdn.co/image/ab67616d0000b27338d7a50443e2a6043d6da247 > ab67616d0000b27338d7a50443e2a6043d6da247.jpg
+#+end_src
+
+#+begin_src bash :results none
+curl https://dummyimage.com/10x10/000000/000000.jpg > black_10x10.jpg
+#+end_src
