@@ -26,7 +26,8 @@
   lwt_glib
   cohttp-lwt-unix
   lwt_ssl
-  ounit2)
+  ounit2
+  qcheck-ounit)
  (tags
   (topics "to describe" your project)))
 

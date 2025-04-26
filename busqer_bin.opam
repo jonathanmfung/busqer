@@ -19,6 +19,7 @@ depends: [
   "cohttp-lwt-unix"
   "lwt_ssl"
   "ounit2"
+  "qcheck-ounit"
   "odoc" {with-doc}
 ]
 build: [

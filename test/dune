@@ -1,6 +1,6 @@
 (test
   (name test_busqer)
   (modes byte exe)
-  (libraries ounit2 busqer lablgtk3)
+  (libraries ounit2 busqer lablgtk3 qcheck-ounit)
   (deps (glob_files data/*))
   (action (run %{test} -ci true)))

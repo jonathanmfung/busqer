@@ -48,6 +48,20 @@ in
 pkgs.mkShell {
   pname = "busqer";
   # src = ./.;
+  buildInputs = with pkgs; [
+    pkg-config
+
+    # GTK
+    glib
+    gtk2
+
+    # TLS for Conduit/Cohttp
+    ocamlPackages.lwt_ssl
+
+    # OUnit
+    ocamlPackages.ounit
+    ocamlPackages.qcheck-ounit
+  ];
   packages = with pkgs; [
     pkg-config
     ocamlPackages.ocaml
