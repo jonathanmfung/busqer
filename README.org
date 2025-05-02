@@ -1,17 +1,5 @@
 #+begin_src bash
-opam install obus
-
-opam install lablgtk
-opam install lwt_glib
-#+end_src
-
-#+begin_src bash
-opam exec -- obus-introspect -rec org.mpris.MediaPlayer2.spotify / > data/spotify.xml
-opam exec -- obus-gen-interface data/spotify.xml
-opam exec -- obus-gen-client data/spotify.xml
-
-opam exec -- dune pkg lock
-opam exec -- dune exec spotify_dbus
+dune exec spotify_dbus
 #+end_src
 
 - Simple Spotify interface through DBus

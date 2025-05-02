@@ -1,0 +1,5 @@
+#+begin_src bash
+obus-introspect -rec org.mpris.MediaPlayer2.spotify / > spotify.xml
+obus-gen-interface data/spotify.xml
+obus-gen-client data/spotify.xml
+#+end_src
