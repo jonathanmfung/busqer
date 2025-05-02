@@ -8,14 +8,14 @@
 *)
 
 let ( let* ) = Lwt.bind
-open Spotify_dbus
+open Busqer
 
 let gui () =
   Lwt_main.run
     ((* * GTK Init * *)
      ignore (GMain.init ());
 
-     let* () = Spotify_dbus.Log.out "GTK Initialized" in
+     let* () = Log.out "GTK Initialized" in
 
      (* Install Lwt<->Glib integration. *)
      Lwt_glib.install ();
@@ -142,7 +142,7 @@ let gui () =
        Lwt_react.S.map
          (fun au ->
            Lwt_result.bind au
-             Spotify_dbus.(
+             (
                fun a ->
                  let ( let* ) = Lwt_result.bind in
                  let* () =
@@ -184,12 +184,12 @@ let gui () =
        | Lwt.Return v -> waiter
        (* TODO: Handle Fail (logging) *)
        | Lwt.Fail exn ->
-           let* () = Spotify_dbus.Log.err "Waiter Failed" in
+           let* () = Log.err "Waiter Failed" in
            waiter
        | Lwt.Sleep -> update_loop ()
      in
      let* () = update_loop () in
-     Spotify_dbus.Log.err "Window closed, exitting gracefully")
+     Log.err "Window closed, exitting gracefully")
 
 let () =
   Printexc.record_backtrace true;
@@ -204,3 +204,8 @@ let () =
 
 (* TODO: For image processing, could look at parallel processing:
    https://ocaml.org/manual/5.0/parallelism.html *)
+
+type _ Effect.t += Xchg: int -> int Effect.t
+type _ Effect.t += WriteFile: string -> unit Effect.t
+let write_file f = Effect.perform (WriteFile f)
+let comp1 () : int = Effect.perform (Xchg 0) + Effect.perform (Xchg 1)

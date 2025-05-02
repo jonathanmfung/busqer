@@ -46,7 +46,7 @@ let
   };
 in
 pkgs.mkShell {
-  pname = "spotify_dbus";
+  pname = "busqer";
   # src = ./.;
   packages = with pkgs; [
     pkg-config

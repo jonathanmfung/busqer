@@ -1,6 +1,6 @@
 (test
-  (name test_spotify_dbus)
+  (name test_busqer)
   (modes byte exe)
-  (libraries ounit2 spotify_dbus lablgtk3)
+  (libraries ounit2 busqer lablgtk3)
   (deps (glob_files data/*))
   (action (run %{test} -ci true)))

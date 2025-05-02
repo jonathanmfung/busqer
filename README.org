@@ -1,5 +1,7 @@
 #+begin_src bash
-dune exec spotify_dbus
+dune build
+dune runtest
+dune exec busqer_bin
 #+end_src
 
 - Simple Spotify interface through DBus

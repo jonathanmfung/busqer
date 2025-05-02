@@ -1,5 +1,5 @@
 (include_subdirs unqualified)
 
 (library
- (name spotify_dbus)
+ (name busqer)
  (libraries obus cohttp-lwt-unix lablgtk3))

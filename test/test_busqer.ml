@@ -23,7 +23,7 @@ let arr2_to_string = Array.fold_left (fun acc a -> acc ^ Format.sprintf "[%s]" (
 
 let pixbuf_to_array_test =
   let pb = GdkPixbuf.from_file "./data/black_10x10.jpg" in
-  let result = Spotify_dbus.ArtUrl.pixbuf_to_array pb in
+  let result = Busqer.ArtUrl.pixbuf_to_array pb in
   let expected = Array.make_matrix 10 10 (0, 0, 0) in
   "pixbuf_to_array" >:: fun _ ->
   assert_equal ~msg:"RGB Array2" ~printer:arr2_to_string expected result

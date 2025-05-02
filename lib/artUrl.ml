@@ -11,7 +11,7 @@ module JpgCache =
   Cache.Make
     (struct
       (* TODO: This cache dir stuff might be more application-level *)
-      let cache_dir = Filename.concat "/home/jonat/.cache" "spotify_dbus"
+      let cache_dir = Filename.concat "/home/jonat/.cache" "busqer"
     end)
     (Jpg)
 

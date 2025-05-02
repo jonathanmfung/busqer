@@ -1,7 +1,7 @@
 (executable
- (public_name spotify_dbus)
+ (public_name busqer_bin)
  (name main)
- (libraries spotify_dbus lwt_glib lablgtk3)
+ (libraries busqer lwt_glib lablgtk3)
  (flags
   (:standard
    -w
