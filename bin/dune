@@ -1,7 +1,7 @@
 (executable
  (public_name spotify_dbus)
  (name main)
- (libraries spotify_dbus lwt_glib lablgtk2)
+ (libraries spotify_dbus lwt_glib lablgtk3)
  (flags
   (:standard
    -w

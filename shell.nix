@@ -52,9 +52,9 @@ pkgs.mkShell {
     pkg-config
     ocamlPackages.ocaml
     ocamlPackages.dune_3
-    ocamlPackages.lablgtk # Version 2.18
 
     # Direct Deps
+    ocamlPackages.lablgtk3
     ocamlPackages.cohttp-lwt-unix
     obus
     lwt_glib
