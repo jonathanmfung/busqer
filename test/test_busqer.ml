@@ -85,8 +85,48 @@ let octree_prop_tests =
                  equal (insert (insert empty a) b) (insert (insert empty b) a)));
          ]
 
+let otsuPcaPart_tests =
+  let open Busqer.OtsuPcaPart in
+  "ZipperTests"
+  >::: [
+         ( "focus_max Identity" >:: fun _ ->
+           let x = Zip { tree = Leaf (Lacaml.S.Mat.make0 3 1); thread = [] } in
+           let res = focus_max_sse x in
+           assert_equal res x );
+         ( "focus_max Basic" >:: fun _ ->
+           let l =
+             Lacaml.S.Mat.of_list [ [ 1.; 2. ]; [ 1.; 2. ]; [ 1.; 2. ] ]
+           in
+           let r =
+             Lacaml.S.Mat.of_list [ [ 1.; 3. ]; [ 1.; 3. ]; [ 1.; 3. ] ]
+           in
+           let x =
+             Zip
+               {
+                 tree =
+                   Node { threshold = (0, 0, 0); left = Leaf l; right = Leaf r };
+                 thread = [];
+               }
+           in
+           let res = focus_max_sse x in
+           let exp =
+             Zip
+               {
+                 tree = Leaf r;
+                 thread = [ Right { threshold = (0, 0, 0); lctx = Leaf l } ];
+               }
+           in
+           assert_equal res exp );
+       ]
+
 let tests =
   test_list
-    [ pixbuf_tests; pixbuf_to_array_test; int_to_bits_test; octree_prop_tests ]
+    [
+      pixbuf_tests;
+      pixbuf_to_array_test;
+      int_to_bits_test;
+      octree_prop_tests;
+      otsuPcaPart_tests;
+    ]
 
 let _ = run_test_tt_main tests
