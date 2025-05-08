@@ -70,6 +70,7 @@ pkgs.mkShell {
     # Direct Deps
     ocamlPackages.lablgtk3
     ocamlPackages.cohttp-lwt-unix
+    ocamlPackages.lacaml
     obus
     lwt_glib
 
