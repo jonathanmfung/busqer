@@ -15,16 +15,17 @@ largest eigenvector of the covariance matrix as the direction for projecting.
 
 open Lacaml.S
 
-type vect3 = int * int * int
 type data_t = mat
 
 type cluster_node =
   | Leaf of data_t
-  | Node of { threshold : vect3; left : cluster_node; right : cluster_node }
+  | Node of { centroid : vec; left : cluster_node; right : cluster_node }
+
+let leaf d = Leaf d
 
 type cluster_path =
-  | Left of { threshold : vect3; rctx : cluster_node }
-  | Right of { threshold : vect3; lctx : cluster_node }
+  | Left of { centroid : vec; rctx : cluster_node }
+  | Right of { centroid : vec; lctx : cluster_node }
 
 type zipper = Zip of { tree : cluster_node; thread : cluster_path list }
 
@@ -39,55 +40,51 @@ let print (c : cluster_node) : unit =
   in
   go 0 c
 
-let replace (Zip { thread; _ }) tree = Zip { tree; thread }
 let mkzip (t : cluster_node) : zipper = Zip { tree = t; thread = [] }
 
 let go_left (Zip { tree; thread = old_thread }) : zipper =
   match tree with
   | Leaf _ -> invalid_arg "go_left Leaf"
-  | Node { threshold; left; right } ->
+  | Node { centroid; left; right } ->
       Zip
-        { thread = Left { threshold; rctx = right } :: old_thread; tree = left }
+        { thread = Left { centroid; rctx = right } :: old_thread; tree = left }
 
 let go_right (Zip { tree; thread = old_thread }) : zipper =
   match tree with
   | Leaf _ -> invalid_arg "go_right Leaf"
-  | Node { threshold; left; right } ->
+  | Node { centroid; left; right } ->
       Zip
-        {
-          thread = Right { threshold; lctx = left } :: old_thread;
-          tree = right;
-        }
+        { thread = Right { centroid; lctx = left } :: old_thread; tree = right }
 
 let go_up (Zip { tree; thread }) : zipper =
   match thread with
   | [] -> invalid_arg "go_up already at top"
-  | Left { rctx; threshold } :: ts ->
-      Zip { tree = Node { threshold; left = tree; right = rctx }; thread = ts }
-  | Right { lctx; threshold } :: ts ->
-      Zip { tree = Node { threshold; left = lctx; right = tree }; thread = ts }
+  | Left { rctx; centroid } :: ts ->
+      Zip { tree = Node { centroid; left = tree; right = rctx }; thread = ts }
+  | Right { lctx; centroid } :: ts ->
+      Zip { tree = Node { centroid; left = lctx; right = tree }; thread = ts }
 
 let rec unzip (Zip { tree; thread } : zipper) : cluster_node =
   match thread with
   | [] -> tree
-  | Left { rctx; threshold } :: ts ->
+  | Left { rctx; centroid } :: ts ->
       unzip
         (Zip
-           { tree = Node { threshold; left = tree; right = rctx }; thread = ts })
-  | Right { lctx; threshold } :: ts ->
+           { tree = Node { centroid; left = tree; right = rctx }; thread = ts })
+  | Right { lctx; centroid } :: ts ->
       unzip
         (Zip
-           { tree = Node { threshold; left = lctx; right = tree }; thread = ts })
+           { tree = Node { centroid; left = lctx; right = tree }; thread = ts })
 
-let grow_leaf (Zip { tree; thread }) (f : data_t -> data_t * data_t) : zipper =
+let grow_leaf (Zip { tree; thread }) (f : data_t -> vec * data_t * data_t) :
+    zipper =
   match tree with
   | Node _ -> invalid_arg "grow_leaf Node"
   | Leaf data ->
-      let left, right = f data in
+      let centroid, left, right = f data in
       Zip
         {
-          tree =
-            Node { threshold = (0, 0, 0); left = Leaf left; right = Leaf right };
+          tree = Node { centroid; left = Leaf left; right = Leaf right };
           thread;
         }
 
@@ -113,30 +110,41 @@ let focus_max (z : zipper) (f : data_t -> float) : zipper =
 
 (* NOTE: Matrix is stored as columns are vectors, n_rows=3 *)
 
-type 'a origin = Origin of 'a
-
-type ('a, 'vec) offset3 =
-  | Offset of { offset : 'vec; x : 'a; f : 'a -> 'vec -> 'a }
-
-let center (Offset { offset; x; f }) : 'a origin = Origin (f x offset)
-
 let principal_component (m : mat) : vec =
   (* TODO: double check that pca of data is same as eigenvector of data
-     Or if it should be eigenvector of covariance matrix *)
+     Or if it should be eigenvector of covariance matrix
+     "Hence, PCA-Part picks the largest eigenvector of the covariance matrix as the direction for projecting."
+  *)
   (* TODO: Check if eigenvector is normalized or not *)
   let _, _, _, right_evec = geev m in
   (Mat.to_col_vecs right_evec).(0)
 
 let mean (m : mat) : vec =
+  (* input m has observations as columns *)
   let sum = Mat.fold_cols (Vec.add ~ofsy:1 ~incy:1) (Vec.make0 3) m in
   let denom = Vec.make 3 (Int.to_float @@ Mat.dim2 m) in
   Vec.div sum denom
 
-let ssd (m : mat) (v : vec) : float =
+let var_mat (m : mat) : mat =
+  (* input m has observations as columns *)
+  let num_vars = Mat.dim1 m in
+  let m_arr =  Mat.to_array @@ Mat.transpose_copy m in (* obs are rows *)
+  let m_mean = Vec.to_array (mean m) in
+  (* https://en.wikipedia.org/wiki/Covariance#Calculating_the_sample_covariance *)
+  Mat.init_rows num_vars num_vars (fun j k ->
+      (* for some reason init_rows is indexed at 1 *)
+      let k = k - 1 in
+      let j = j - 1 in
+      Array.fold_left
+        (fun acc obs ->
+          ((obs.(j) -. m_mean.(j)) *. (obs.(k) -. m_mean.(k))) +. acc)
+        0.0 m_arr)
+
+let sum_sqr_diff (m : mat) (v : vec) : float =
   let diffs = Array.map (Vec.ssqr_diff v) (Mat.to_col_vecs m) in
   Array.fold_left Float.add 0.0 diffs
 
-let focus_max_sse z = focus_max z (fun m -> ssd m (mean m))
+let focus_max_sse z = focus_max z (fun m -> sum_sqr_diff m (mean m))
 
 let project ~(onto : vec) (v : vec) : vec =
   let a = dot v onto /. nrm2 onto in
@@ -147,7 +155,7 @@ let project ~(onto : vec) (v : vec) : vec =
 module IntMap = Map.Make (Int)
 
 (* https://arxiv.org/pdf/1304.7465 pg 6 *)
-type bihist = { l : int; t : int; freqs : float IntMap.t }
+type bihist = { (* l : int;  *) t : int; freqs : float IntMap.t }
 
 let make_freqs (xs : int list) : float IntMap.t =
   let counts =
@@ -167,18 +175,14 @@ let split_class (freqs : float IntMap.t) (t : int) :
 
 let gen_bihist ~l (data : int list) : (int * bihist) list =
   let ts = List.init l (fun i -> i) in
-  List.mapi (fun i t -> (i, { l; t; freqs = make_freqs data })) ts
+  List.mapi (fun i t -> (i, { (* l; *) t; freqs = make_freqs data })) ts
 
 let argmax (bs : (int * bihist) list) (f : bihist -> 'a) : int =
   let max (i1, x1) (i2, x2) = if f x1 < f x2 then (i2, x2) else (i1, x1) in
   let tmax, _bhmax =
-    List.fold_left max (0, { l = 0; t = 0; freqs = IntMap.empty }) bs
+    List.fold_left max (0, { (* l = 0; *) t = 0; freqs = IntMap.empty }) bs
   in
   tmax
-
-let mu_full ({ freqs; _ } : bihist) : float =
-  (* mu_threshold is just this but on class_0 *)
-  IntMap.fold (fun k v acc -> (Float.of_int k *. v) +. acc) freqs 0.0
 
 let btwn_class_var (bh : bihist) : float =
   let pair_map (a, b) f = (f a, f b) in
@@ -205,41 +209,21 @@ let binify (xs : float list) ~(l : int) : int list =
     xs
 
 let split_step (z : zipper) : zipper =
-  (* TODO: incorporate principal_component and projection *)
-  (* data: [coord]
-     threshold: {offset:coord, vec}
-
-     project data onto threshold
-     1. adj = data - offset
-     1a. ensure |max(adj)|< |vec| (so that projection is valid)
-     2. a = vec_project adj onto vec
-     3. partition (a < vec)
-
-     tstar is argmax (btwn_class_var)
-     split_class tstar is bihist split
-     actual split is grow_leaf z (f : data_t -> data_t * data_t)
-
-     Handle init case (no prev threshold)
-  *)
-  let split_data m =
-    let tuplefy (a, b) = (Mat.of_col_vecs_list a, Mat.of_col_vecs_list b) in
-    let threshold = mean m in
-    tuplefy (List.partition (fun v -> v < threshold) (Mat.to_col_vecs_list m))
-  in
+  (* let split_data m = *)
+  (*   let tuplefy (a, b) = (Mat.of_col_vecs_list a, Mat.of_col_vecs_list b) in *)
+  (*   let threshold = mean m in *)
+  (*   tuplefy (List.partition (fun v -> v < threshold) (Mat.to_col_vecs_list m)) *)
+  (* in *)
   let combine_with xs ys f =
     List.map (fun (x, y) -> f x y) (List.combine xs ys)
   in
   let split_otsu m =
     let l = 256 in
-    let tuplefy (a, b) =
-      let f xs = Mat.of_col_vecs_list @@ List.map (fun (v, _, _) -> v) xs in
-      (f a, f b)
-    in
     let mean = mean m in
     let zero_mean =
       List.map (fun x -> Vec.sub x mean) (Mat.to_col_vecs_list m)
     in
-    let pca = principal_component m in
+    let pca = principal_component (var_mat m) in
     (* Map of vec : projection : bin *)
     (* NOTE: let a' = project a onto b -> b - a' = [x; 0;...] AKA parallel *)
     let vec_proj_assoc =
@@ -258,39 +242,23 @@ let split_step (z : zipper) : zipper =
     let offset = copy pca in
     scal pstar offset;
     let centroid = Vec.add mean offset in
-    (* TODO: attach centroid to new node *)
-    tuplefy (List.partition (fun (_, _, b) -> b < tstar) vpb_assoc)
+    let to_mat xs = Mat.of_col_vecs_list @@ List.map (fun (v, _, _) -> v) xs in
+    let left, right = List.partition (fun (_, _, b) -> b < tstar) vpb_assoc in
+    (centroid, to_mat left, to_mat right)
   in
   let z' = focus_max_sse z in
-  let z'' = grow_leaf z' split_data in
+  let z'' = grow_leaf z' split_otsu in
   z''
-
-(*   let pc_axis = principal_component data in *)
-(*   let project (x, _, _) = x in *)
-(*   let alpha = *)
-(*     (project @@ List.fold_left coord_add (0, 0, 0) data) / List.length data *)
-(*   in *)
-(*   let l, r = List.partition (fun (x, _, _) -> x <= alpha) data in *)
-(*   Node { threshold = alpha; left = Leaf l; right = Leaf r } *)
 
 let rec n_times (n : int) (x : 'a) (f : 'a -> 'a) : 'a =
   match n with 0 -> x | n -> n_times (pred n) (f x) f
 
-let cluster (d : data_t) (k : int) : cluster_node =
+let cluster d k =
   let init = mkzip @@ Leaf d in
   unzip @@ n_times k init split_step
 
-(* let () = *)
-(*   let a = Mat.random 5 3 in *)
-(*   let lv, wr, wi, rv = geev a in *)
-(*   Format.printf "@[<2>a:@\n@\n%a@]@.\n" (Lacaml.Io.pp_lfmat ()) a; *)
-(*   Format.printf "@[<2>lv:@\n@\n%a@]@.\n" (Lacaml.Io.pp_lfmat ()) lv; *)
-(*   Format.printf "@[<2>wr:@\n@\n%a@]@.\n" (Lacaml.Io.pp_lfvec ()) wr; *)
-(*   Format.printf "@[<2>wi:@\n@\n%a@]@.\n" (Lacaml.Io.pp_lfvec ()) wi; *)
-(*   Format.printf "@[<2>rv:@\n@\n%a@]@.\n" (Lacaml.Io.pp_lfmat ()) rv *)
-
 let () =
-  let d = Lacaml.S.Mat.random 3 10 in
+  let d = Lacaml.S.Mat.random 3 12 in
   let x = cluster d 3 in
   Format.printf "@[<2>d:@\n@\n%a@]@.\n" (Lacaml.Io.pp_lfmat ()) d;
   print x

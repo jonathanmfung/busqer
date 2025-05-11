@@ -36,7 +36,7 @@ let int_to_bits_test =
     assert_equal ~msg:"bool list value"
       ~printer:(List.fold_left (fun acc a -> acc ^ Format.sprintf "%b " a) "")
   in
-  let open Spotify_dbus.Octree in
+  let open Busqer.Octree in
   "int_to_bits"
   >::: [
          ( "0" >:: fun _ ->
@@ -57,18 +57,18 @@ let int_to_bits_test =
              [ false; false; false; false; true; false; false; true ] );
        ]
 
-let rgb_gen : Spotify_dbus.Octree.rgb QCheck2.Gen.t =
-  let rgb x y z = Spotify_dbus.Octree.Rgb (x, y, z) in
+let rgb_gen : Busqer.Octree.rgb QCheck2.Gen.t =
+  let rgb x y z = Busqer.Octree.Rgb (x, y, z) in
   QCheck2.Gen.(
     let u8 = 0 -- 255 in
     rgb <$> u8 <*> u8 <*> u8)
 
 let rgb_print =
-  let unrgb (Spotify_dbus.Octree.Rgb (x, y, z)) = (x, y, z) in
+  let unrgb (Busqer.Octree.Rgb (x, y, z)) = (x, y, z) in
   QCheck2.Print.(contramap unrgb @@ triple int int int)
 
 let octree_prop_tests =
-  let open Spotify_dbus.Octree in
+  let open Busqer.Octree in
   (* let eq = assert_equal ~msg:"octree value" ~printer:to_string in *)
   "OctreePropTests"
   >::: List.map QCheck_ounit.to_ounit2_test
@@ -90,7 +90,7 @@ let otsuPcaPart_tests =
   "ZipperTests"
   >::: [
          ( "focus_max Identity" >:: fun _ ->
-           let x = Zip { tree = Leaf (Lacaml.S.Mat.make0 3 1); thread = [] } in
+           let x = mkzip @@ leaf (Lacaml.S.Mat.make0 3 1) in
            let res = focus_max_sse x in
            assert_equal res x );
          ( "focus_max Basic" >:: fun _ ->
@@ -100,22 +100,14 @@ let otsuPcaPart_tests =
            let r =
              Lacaml.S.Mat.of_list [ [ 1.; 3. ]; [ 1.; 3. ]; [ 1.; 3. ] ]
            in
+           let centroid = Lacaml.S.Vec.make0 3 in
            let x =
-             Zip
-               {
-                 tree =
-                   Node { threshold = (0, 0, 0); left = Leaf l; right = Leaf r };
-                 thread = [];
-               }
+             grow_leaf
+               (mkzip @@ leaf Lacaml.S.Mat.empty)
+               (fun _ -> (centroid, l, r))
            in
            let res = focus_max_sse x in
-           let exp =
-             Zip
-               {
-                 tree = Leaf r;
-                 thread = [ Right { threshold = (0, 0, 0); lctx = Leaf l } ];
-               }
-           in
+           let exp = go_right x in
            assert_equal res exp );
        ]
 
