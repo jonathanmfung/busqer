@@ -117,6 +117,75 @@ let pixbuf_to_array (pb : GdkPixbuf.pixbuf) : pb_array =
   in
   Array.init_matrix width_px height_px px_val_at
 
+let pb_array_to_mat (arr : pb_array) =
+  let flat = Array.concat @@ Array.to_list arr in
+  let triple_to_vec (a, b, c) =
+    Lacaml.S.Vec.of_array [| Float.of_int a; Float.of_int b; Float.of_int c |]
+  in
+  Lacaml.S.Mat.of_col_vecs @@ Array.map triple_to_vec flat
+
+(* Copied from https://github.com/rlepigre/ocaml-imagelib/blob/master/unix/imageLib_unix.ml
+   Which is GNU LGPL 3.0
+   Original convert::create_process runs concurrently, which I think means that filename' can be prematurely read by chunk_reader
+   Use open/close_process so that program blocks until `magick` terminates. *)
+let openfile fn : Image.image =
+  let convert filename filename' =
+    (* don't accidentally put command-line options here *)
+    assert (String.get filename  0 <> '-');
+    assert (String.get filename' 0 <> '-');
+    let ich, och = Unix.open_process_args "magick" [| "magick"; filename ; filename' |] in
+    Unix.close_process (ich, och)
+  in
+  let rm filename =
+    Sys.remove filename in
+  let extension = (ImageUtil_unix.get_extension' fn) in
+  Printf.printf "extension done \n";
+  let ich = ImageUtil_unix.chunk_reader_of_path fn in
+  Printf.printf "ich done \n";
+  let fallback () =
+    (* This will run imagemagick's "convert" utility to
+       transform the picture to PNG, then use the mature PNG reader.
+    *)
+    Printf.printf "starting fallback \n";
+    let fn' = Filename.temp_file "image" ".png" in
+    ignore @@ convert fn fn';
+    Printf.printf "fallback: convert done (%s) to (%s) \n" fn fn';
+    let ich' = ImageUtil_unix.chunk_reader_of_path fn' in
+    Printf.printf "fallback: ich' done \n";
+    let img = ImagePNG.parsefile ich' in (* TODO: this is failing for some reason, even though repl works *)
+    Printf.printf "fallback: img done \n";
+    rm fn'; Printf.printf "fallback done \n";img
+  in
+  if extension = "gif" then
+    fallback ()
+    (* GIF support is still limited, to avoid breaking existing applications
+       we do not use it from the _unix module. *)
+  else
+  try ImageLib.openfile ~extension ich with
+  | Image.Not_yet_implemented _ -> fallback ()
+
+
+let jpg_to_mat (path : string) : Lacaml.S.mat =
+  (* TODO: ocaml Unix.command is thinking that `convert` is erroring even when in bash the error code is 0
+
+     reimplement ImageLib_unix.openfile but with convert not checking ret <> 0
+   *)
+  let img = openfile path in
+  let read (row, col) : Lacaml.S.vec =
+    (* TODO: double check Image.read arg order is col then row *)
+    Image.read_rgb img col row (fun a b c ->
+        Lacaml.S.Vec.of_array
+          [| Float.of_int a; Float.of_int b; Float.of_int c |])
+  in
+  let img_coords =
+    Array.concat
+    @@ List.map
+         (fun h -> Array.init img.width (fun w -> (h, w )))
+         (List.init img.height (fun h -> h ))
+  in
+  assert (img.width * img.height = Array.length img_coords);
+  Lacaml.S.Mat.of_col_vecs @@ Array.map (read) img_coords
+
 (*
 Mean shift clustering
 Init cluster starts at first pixel's color
