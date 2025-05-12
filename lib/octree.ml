@@ -34,17 +34,16 @@ let rec equal (a : t) (b : t) : bool =
   match (a, b) with
   | ( Node { data = data_a; count = count_a },
       Node { data = data_b; count = count_b } ) ->
-     count_a = count_b && BoolTripleMap.equal equal data_a data_b
+      count_a = count_b && BoolTripleMap.equal equal data_a data_b
 
 let height (t : t) : int =
   let rec go n t' =
     match t' with
-      Node {data; _} ->
-      if BoolTripleMap.is_empty data
-      then 0
-      else
-        BoolTripleMap.fold (fun _k v acc -> go (succ n) v + acc) data 0
-  in go 0 t
+    | Node { data; _ } ->
+        if BoolTripleMap.is_empty data then 0
+        else BoolTripleMap.fold (fun _k v acc -> go (succ n) v + acc) data 0
+  in
+  go 0 t
 
 let rec insert_seq (t : t) (r_b : bool Seq.t) g_b b_b : t =
   match (r_b (), g_b (), b_b ()) with
@@ -100,17 +99,17 @@ end)
 
 let num_colors (_t : t) : int = 32
 
-let reduce_step (t : t): t=
+let reduce_step (t : t) : t =
   (* let candidate = node with max count sum of children
      search for all leaf nodes, backtrack to parent, sum children counts, agg max
      then dfs for this value
-   *)
+  *)
   t
 
 (* search for all nodes at deepest level.
    construct map of all childrens' colors to parent's
    set parent.data = BoolTripleMap.empty
- *)
+*)
 
 let reduce (t : t) (n : int) : t option =
   let seq = Seq.iterate reduce_step t in

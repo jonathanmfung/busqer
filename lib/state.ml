@@ -49,7 +49,7 @@ end = struct
   let make_art_url md = ArtUrl.A.from_url @@ art_url md
 
   let to_string = function
-    | `TrackInfo ti -> ti.title ^ ti.artist
+    | `TrackInfo ti -> Format.sprintf "%s - %s" ti.artist ti.title
     | `Length l -> microsecond_to_minsec l
     | `ArtUrl s -> s
 end

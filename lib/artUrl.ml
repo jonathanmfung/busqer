@@ -131,14 +131,15 @@ let pb_array_to_mat (arr : pb_array) =
 let openfile fn : Image.image =
   let convert filename filename' =
     (* don't accidentally put command-line options here *)
-    assert (String.get filename  0 <> '-');
+    assert (String.get filename 0 <> '-');
     assert (String.get filename' 0 <> '-');
-    let ich, och = Unix.open_process_args "magick" [| "magick"; filename ; filename' |] in
+    let ich, och =
+      Unix.open_process_args "magick" [| "magick"; filename; filename' |]
+    in
     Unix.close_process (ich, och)
   in
-  let rm filename =
-    Sys.remove filename in
-  let extension = (ImageUtil_unix.get_extension' fn) in
+  let rm filename = Sys.remove filename in
+  let extension = ImageUtil_unix.get_extension' fn in
   Printf.printf "extension done \n";
   let ich = ImageUtil_unix.chunk_reader_of_path fn in
   Printf.printf "ich done \n";
@@ -152,24 +153,25 @@ let openfile fn : Image.image =
     Printf.printf "fallback: convert done (%s) to (%s) \n" fn fn';
     let ich' = ImageUtil_unix.chunk_reader_of_path fn' in
     Printf.printf "fallback: ich' done \n";
-    let img = ImagePNG.parsefile ich' in (* TODO: this is failing for some reason, even though repl works *)
+    let img = ImagePNG.parsefile ich' in
+    (* TODO: this is failing for some reason, even though repl works *)
     Printf.printf "fallback: img done \n";
-    rm fn'; Printf.printf "fallback done \n";img
+    rm fn';
+    Printf.printf "fallback done \n";
+    img
   in
-  if extension = "gif" then
-    fallback ()
+  if extension = "gif" then fallback ()
     (* GIF support is still limited, to avoid breaking existing applications
        we do not use it from the _unix module. *)
   else
-  try ImageLib.openfile ~extension ich with
-  | Image.Not_yet_implemented _ -> fallback ()
-
+    try ImageLib.openfile ~extension ich
+    with Image.Not_yet_implemented _ -> fallback ()
 
 let jpg_to_mat (path : string) : Lacaml.S.mat =
   (* TODO: ocaml Unix.command is thinking that `convert` is erroring even when in bash the error code is 0
 
      reimplement ImageLib_unix.openfile but with convert not checking ret <> 0
-   *)
+  *)
   let img = openfile path in
   let read (row, col) : Lacaml.S.vec =
     (* TODO: double check Image.read arg order is col then row *)
@@ -180,11 +182,11 @@ let jpg_to_mat (path : string) : Lacaml.S.mat =
   let img_coords =
     Array.concat
     @@ List.map
-         (fun h -> Array.init img.width (fun w -> (h, w )))
-         (List.init img.height (fun h -> h ))
+         (fun h -> Array.init img.width (fun w -> (h, w)))
+         (List.init img.height (fun h -> h))
   in
   assert (img.width * img.height = Array.length img_coords);
-  Lacaml.S.Mat.of_col_vecs @@ Array.map (read) img_coords
+  Lacaml.S.Mat.of_col_vecs @@ Array.map read img_coords
 
 (*
 Mean shift clustering

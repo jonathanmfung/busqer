@@ -40,7 +40,8 @@ let to_hexstring v =
   let int_to_hexadecimal n =
     (* if n < 0 || 255 < n then *)
     (*   failwith "to_hexstring::int_to_hexadecimal n not in range 0..255"; *)
-    Printf.sprintf "%02X" n in
+    Printf.sprintf "%02X" n
+  in
   let f x = int_to_hexadecimal (Int.of_float x) in
   match Vec.to_list v with
   | [ a; b; c ] -> (fun (x, y, z) -> "#" ^ f x ^ f y ^ f z) (a, b, c)
@@ -224,7 +225,9 @@ let split_step (z : zipper) : zipper =
     let offset = copy pca in
     scal pstar offset;
     let centroid = Vec.add mean offset in
-    let to_mat xs = Mat.of_col_vecs_list @@ List.map (fun (v, _, _) -> Vec.add mean v) xs in
+    let to_mat xs =
+      Mat.of_col_vecs_list @@ List.map (fun (v, _, _) -> Vec.add mean v) xs
+    in
     let left, right = List.partition (fun (_, _, b) -> b < tstar) vpb_assoc in
     (centroid, to_mat left, to_mat right)
   in

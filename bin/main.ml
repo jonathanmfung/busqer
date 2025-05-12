@@ -8,6 +8,7 @@
 *)
 
 let ( let* ) = Lwt.bind
+
 open Busqer
 
 let gui () =
@@ -144,7 +145,8 @@ let gui () =
      (* Update Album Art *)
      let rng_elt arr =
        let n = Random.int (Array.length arr) in
-       Array.get arr n in
+       Array.get arr n
+     in
 
      let mat_to_centroids (m : Lacaml.S.mat) =
        let tree = OtsuPcaPart.cluster m 3 in
@@ -155,32 +157,36 @@ let gui () =
        OtsuPcaPart.to_hexstring (rng_elt (Array.of_list c))
      in
 
-
      (* let pb_to_ran_color pb : string= *)
      (*   let data = ArtUrl.(pb_array_to_mat (pixbuf_to_array pb)) in *)
      (*   Printf.printf "data done\n"; *)
      (*   mat_to_ran_color data *)
      (* in *)
-
      let css_provider_from_data data =
        let provider = GObj.css_provider () in
        provider#load_from_data data;
-       provider in
+       provider
+     in
 
-     let mk_provider (css:string) = (css_provider_from_data css)#as_css_provider in
+     let mk_provider (css : string) =
+       (css_provider_from_data css)#as_css_provider
+     in
      let add_provider_to_screen css_prov =
-       GtkData.StyleContext.add_provider_for_screen
-         (Gdk.Screen.default ())
-         css_prov
-         GtkData.StyleContext.ProviderPriority.application in
+       GtkData.StyleContext.add_provider_for_screen (Gdk.Screen.default ())
+         css_prov GtkData.StyleContext.ProviderPriority.application
+     in
      let remove_provider_from_screen css_prov =
-       GtkData.StyleContext.remove_provider_for_screen
-         (Gdk.Screen.default ())
-         css_prov in
+       GtkData.StyleContext.remove_provider_for_screen (Gdk.Screen.default ())
+         css_prov
+     in
      (* TODO: Making full css string will be horrible because it means all FRP components feed into one big thing,
         which will probably break the concurrency law
-      *)
-     let css_str color = Format.sprintf "* { color: blue } label#track_info {background-color: %s}" color in
+     *)
+     let css_str color =
+       Format.sprintf
+         "* { color: blue } label#track_info {background-color: %s}" color
+     in
+
      (* let red = mk_provider (css_str "red") in *)
      (* let green = mk_provider (css_str "#00ff00") in *)
      (* add_provider_to_screen red; *)
@@ -199,8 +205,6 @@ let gui () =
      (* GtkData.Style.set_bg (track_info_w#style) `NORMAL (Gdk.Color.color_parse "#ff00ff"); *)
      (* let style = track_info_w#misc#style#copy in *)
      (* style#set_bg [`NORMAL,`NAME "#ff00ff"]; *)
-
-
      let pb_init = GdkPixbuf.create ~width:1 ~height:1 () in
      let img = GMisc.image ~pixbuf:pb_init ~packing:vbox#add () in
 
@@ -220,43 +224,43 @@ let gui () =
         Thinking of saving in-memory Buffer, then using another Image library to read raw pixels (stb_image, imagelib, Camlimages)
           Library should be able to read Buffer.t (else would have to read from cache)
         Gtk seems to support saving as “jpeg”, “png”, “ico” and “bmp”
-      *)
-
-     let colors = [|"#ff0000";"#00ff00";"#0000ff"|] in
+     *)
+     let colors = [| "#ff0000"; "#00ff00"; "#0000ff" |] in
 
      let _update_album_art =
        Lwt_react.S.map
          (fun au ->
-           Lwt_result.bind au
-             (
-               fun a ->
-                 let ( let* ) = Lwt_result.bind in
-                 let* () =
-                   Lwt_result.map_error (fun e -> [ e ]) (ArtUrl.A.to_cache a)
-                 in
-                 let a_filepath = ArtUrl.A.abs_path a in
-                 (* let a_filepath = "/home/jonat/ocaml/busqer/test/data/black_10x10.jpg" in *)
-                 let centroids = (mat_to_centroids (ArtUrl.(jpg_to_mat a_filepath))) in
+           Lwt_result.bind au (fun a ->
+               let ( let* ) = Lwt_result.bind in
+               let* () =
+                 Lwt_result.map_error (fun e -> [ e ]) (ArtUrl.A.to_cache a)
+               in
+               let a_filepath = ArtUrl.A.abs_path a in
+               (* let a_filepath = "/home/jonat/ocaml/busqer/test/data/black_10x10.jpg" in *)
+               let centroids =
+                 mat_to_centroids ArtUrl.(jpg_to_mat a_filepath)
+               in
 
-                 let pb = GdkPixbuf.from_file a_filepath in
-                 Lwt_result.return
-                 @@ Lwt_mutex.with_lock mx_gui (fun () ->
-                        Lwt.return @@ (img#set_pixbuf pb;
-                                       (* add_provider_to_screen (mk_provider (css_str (pb_to_ran_color pb))) *)
-                                       (* (pb_to_ran_color pb); *)
-                                       (* (ArtUrl.pixbuf_to_array pb) *)
-                                       (* Log.out "arr size: %i" @@ Array.length (ArtUrl.pixbuf_to_array pb) *)
-                                       (* Log.out "dim2: %i" @@ Lacaml.S.Mat.dim2 (ArtUrl.(jpg_to_mat a_filepath)) *)
-                                       (* (mat_to_ran_color (ArtUrl.(jpg_to_mat a_filepath))) *)
-                                       ignore @@ Log.out "num_centoids: %i" @@ List.length @@ centroids;
-                                       (* TODO: centroids can be negative values *)
-                                       let color = (centroids_to_ran_color centroids) in
-                                       ignore @@ Log.out "ran_color: %s" color;
-                                       add_provider_to_screen (mk_provider (css_str color))
-                                       (* Log.out "color: %s" (css_str (rng_elt colors)) *)
-                        (* add_provider_to_screen (mk_provider (css_str (rng_elt colors))); *)
-
-         ))))
+               let pb = GdkPixbuf.from_file a_filepath in
+               Lwt_result.return
+               @@ Lwt_mutex.with_lock mx_gui (fun () ->
+                      Lwt.return
+                      @@
+                      (img#set_pixbuf pb;
+                       (* add_provider_to_screen (mk_provider (css_str (pb_to_ran_color pb))) *)
+                       (* (pb_to_ran_color pb); *)
+                       (* (ArtUrl.pixbuf_to_array pb) *)
+                       (* Log.out "arr size: %i" @@ Array.length (ArtUrl.pixbuf_to_array pb) *)
+                       (* Log.out "dim2: %i" @@ Lacaml.S.Mat.dim2 (ArtUrl.(jpg_to_mat a_filepath)) *)
+                       (* (mat_to_ran_color (ArtUrl.(jpg_to_mat a_filepath))) *)
+                       ignore @@ Log.out "num_centoids: %i" @@ List.length
+                       @@ centroids;
+                       (* TODO: centroids can be negative values *)
+                       let color = centroids_to_ran_color centroids in
+                       ignore @@ Log.out "ran_color: %s" color;
+                       add_provider_to_screen (mk_provider (css_str color))
+                       (* Log.out "color: %s" (css_str (rng_elt colors)) *)
+                       (* add_provider_to_screen (mk_provider (css_str (rng_elt colors))); *)))))
          art_url
      in
 
@@ -310,7 +314,8 @@ let () =
 (* TODO: For image processing, could look at parallel processing:
    https://ocaml.org/manual/5.0/parallelism.html *)
 
-type _ Effect.t += Xchg: int -> int Effect.t
-type _ Effect.t += WriteFile: string -> unit Effect.t
+type _ Effect.t += Xchg : int -> int Effect.t
+type _ Effect.t += WriteFile : string -> unit Effect.t
+
 let write_file f = Effect.perform (WriteFile f)
 let comp1 () : int = Effect.perform (Xchg 0) + Effect.perform (Xchg 1)
