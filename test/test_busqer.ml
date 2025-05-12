@@ -89,6 +89,14 @@ let otsuPcaPart_tests =
   let open Busqer.OtsuPcaPart in
   "ZipperTests"
   >::: [
+         ( "centroids" >:: fun _ ->
+           let m = Lacaml.S.Mat.empty in
+           let elt = Lacaml.S.Vec.make0 3 in
+           let f z = go_left @@ grow_leaf z (fun _ -> (elt, m, m)) in
+           let x = unzip @@ f (f (f (mkzip (leaf m)))) in
+           let res = centroids x in
+           let exp = [ elt; elt; elt ] in
+           assert_equal res exp );
          ( "focus_max Identity" >:: fun _ ->
            let x = mkzip @@ leaf (Lacaml.S.Mat.make0 3 1) in
            let res = focus_max_sse x in
