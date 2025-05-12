@@ -26,6 +26,7 @@
   lwt_glib
   cohttp-lwt-unix
   lwt_ssl
+  imagelib
   ounit2
   qcheck-ounit)
  (tags

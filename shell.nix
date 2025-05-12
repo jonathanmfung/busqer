@@ -71,6 +71,7 @@ pkgs.mkShell {
     ocamlPackages.lablgtk3
     ocamlPackages.cohttp-lwt-unix
     ocamlPackages.lacaml
+    ocamlPackages.imagelib
     obus
     lwt_glib
 
@@ -78,6 +79,7 @@ pkgs.mkShell {
     ocamlPackages.lwt_ssl # TLS for Conduit/Cohttp
     ocamlPackages.ounit
     ocamlPackages.xmlm
+    imagemagick # convert for imagelib jpg -> png
 
     # for scripts/
     graphviz

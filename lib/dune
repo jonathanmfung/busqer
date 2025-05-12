@@ -2,4 +2,4 @@
 
 (library
  (name busqer)
- (libraries obus cohttp-lwt-unix lablgtk3 lacaml))
+ (libraries obus cohttp-lwt-unix lablgtk3 lacaml imagelib.unix))
