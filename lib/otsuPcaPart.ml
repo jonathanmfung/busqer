@@ -13,6 +13,8 @@ tion which contributes to the largest SSE [12]. Hence, PCA-Part picks the
 largest eigenvector of the covariance matrix as the direction for projecting.
 *)
 
+let ( let* ) = Lwt.bind
+
 open Lacaml.S
 
 type elt_t = vec
@@ -113,17 +115,14 @@ let rec unzip (Zip { tree; thread } : zipper) : cluster_node =
         (Zip
            { tree = Node { centroid; left = lctx; right = tree }; thread = ts })
 
-let grow_leaf (Zip { tree; thread }) (f : data_t -> elt_t * data_t * data_t) :
-    zipper =
+let grow_leaf (Zip { tree; thread }) (f : data_t -> (elt_t * data_t * data_t) Lwt.t) :
+      zipper Lwt.t=
   match tree with
   | Node _ -> invalid_arg "grow_leaf Node"
   | Leaf data ->
-      let centroid, left, right = f data in
-      Zip
-        {
-          tree = Node { centroid; left = Leaf left; right = Leaf right };
-          thread;
-        }
+     let* centroid, left, right = f data in
+     let tree = Node { centroid; left = Leaf left; right = Leaf right } in
+     Lwt.return @@ Zip {tree; thread;}
 
 let canon z = mkzip @@ unzip z
 
@@ -186,7 +185,7 @@ let project ~(onto : vec) (v : vec) : vec =
   scal a out;
   out
 
-let split_step (z : zipper) : zipper =
+let split_step (z : zipper) : zipper Lwt.t =
   (* let split_data m = *)
   (*   let tuplefy (a, b) = (Mat.of_col_vecs_list a, Mat.of_col_vecs_list b) in *)
   (*   let threshold = mean m in *)
@@ -216,9 +215,8 @@ let split_step (z : zipper) : zipper =
     let vpb_assoc =
       combine_with vec_proj_assoc bins (fun (v, p) b -> (v, p, b))
     in
-    let tstar =
-      Bihist.argmax (Bihist.gen_bihist ~l bins) Bihist.btwn_class_var
-    in
+    let* bihists = Bihist.gen_bihist ~l bins in
+    let tstar = Bihist.argmax bihists Bihist.btwn_class_var in
     let pstar =
       (fun (_, p, _) -> p) (List.find (fun (_, _, b) -> b = tstar) vpb_assoc)
     in
@@ -229,18 +227,23 @@ let split_step (z : zipper) : zipper =
       Mat.of_col_vecs_list @@ List.map (fun (v, _, _) -> Vec.add mean v) xs
     in
     let left, right = List.partition (fun (_, _, b) -> b < tstar) vpb_assoc in
-    (centroid, to_mat left, to_mat right)
+    Lwt.return (centroid, to_mat left, to_mat right)
   in
   let z' = focus_max_sse z in
   let z'' = grow_leaf z' split_otsu in
   z''
 
-let rec n_times (n : int) (x : 'a) (f : 'a -> 'a) : 'a =
-  match n with 0 -> x | n -> n_times (pred n) (f x) f
-
 let cluster d k =
-  let init = mkzip @@ Leaf d in
-  unzip @@ n_times k init split_step
+  (* TODO: maybe switch to Seq.iterate *)
+  let init = Lwt.return @@ mkzip @@ Leaf d in
+  let seq = Seq.iterate (fun x -> Lwt.bind x split_step) init in
+  let kth = Seq.drop k @@ Seq.take (k + 1) seq in
+  match Seq.uncons kth with
+  | None -> failwith "cluster: unreachable, drop more than take"
+  | Some (x, xs) -> (
+      match xs () with
+      | Seq.Cons _ -> failwith "cluster: unreachable, take more than drop"
+      | Seq.Nil -> Lwt.map unzip x)
 
 (* let () = *)
 (*   let d = Lacaml.S.Mat.random 3 12 in *)

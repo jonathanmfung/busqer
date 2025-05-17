@@ -150,7 +150,7 @@ let gui () =
 
      let mat_to_centroids (m : Lacaml.S.mat) =
        let tree = OtsuPcaPart.cluster m 3 in
-       OtsuPcaPart.centroids tree
+       Lwt.map OtsuPcaPart.centroids tree
      in
 
      let centroids_to_ran_color c =
@@ -236,31 +236,42 @@ let gui () =
                  Lwt_result.map_error (fun e -> [ e ]) (ArtUrl.A.to_cache a)
                in
                let a_filepath = ArtUrl.A.abs_path a in
-               (* let a_filepath = "/home/jonat/ocaml/busqer/test/data/black_10x10.jpg" in *)
-               let centroids =
-                 mat_to_centroids ArtUrl.(jpg_to_mat a_filepath)
-               in
-
                let pb = GdkPixbuf.from_file a_filepath in
                Lwt_result.return
                @@ Lwt_mutex.with_lock mx_gui (fun () ->
-                      Lwt.return
-                      @@
-                      (img#set_pixbuf pb;
-                       (* add_provider_to_screen (mk_provider (css_str (pb_to_ran_color pb))) *)
-                       (* (pb_to_ran_color pb); *)
-                       (* (ArtUrl.pixbuf_to_array pb) *)
-                       (* Log.out "arr size: %i" @@ Array.length (ArtUrl.pixbuf_to_array pb) *)
-                       (* Log.out "dim2: %i" @@ Lacaml.S.Mat.dim2 (ArtUrl.(jpg_to_mat a_filepath)) *)
-                       (* (mat_to_ran_color (ArtUrl.(jpg_to_mat a_filepath))) *)
-                       ignore @@ Log.out "num_centoids: %i" @@ List.length
-                       @@ centroids;
-                       (* TODO: centroids can be negative values *)
-                       let color = centroids_to_ran_color centroids in
-                       ignore @@ Log.out "ran_color: %s" color;
-                       add_provider_to_screen (mk_provider (css_str color))
-                       (* Log.out "color: %s" (css_str (rng_elt colors)) *)
-                       (* add_provider_to_screen (mk_provider (css_str (rng_elt colors))); *)))))
+                      Lwt.return @@ img#set_pixbuf pb)))
+         art_url
+     in
+
+     let _update_album_color =
+       Lwt_react.S.map
+         (fun au ->
+           Lwt_result.bind au (fun a ->
+               let ( let* ) = Lwt_result.bind in
+               (* let* () = *)
+               (*   Lwt_result.map_error (fun e -> [ e ]) (ArtUrl.A.to_cache a) *)
+               (* in *)
+               let a_filepath = ArtUrl.A.abs_path a in
+               (* let a_filepath = "/home/jonat/ocaml/busqer/test/data/black_10x10.jpg" in *)
+               (* TODO: Need to understand how (Lwt)_React handles queues of updates (e.g. skipping many times) *)
+               let ( let* ) = Lwt.bind in
+               (* TODO: jpg_to_mat (my openfile) has in_channels that are not Lwt *)
+               (* TODO: jpg_to_mat seems to be blocking GUI ????*)
+               let* mat = ArtUrl.jpg_to_mat a_filepath in
+               let* () = Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 mat) in
+               let* centroids = mat_to_centroids mat in
+               let color = centroids_to_ran_color centroids in
+               let prov = mk_provider (css_str color) in
+               let* () = Log.err "ran_color: %s" color in
+               Lwt_result.return
+               @@ Lwt_mutex.with_lock mx_gui (fun () ->
+                      track_info_w#set_text color;
+                      Lwt.return @@ add_provider_to_screen prov
+                    (* TODO: maybe add_provider calls some blocking io?  *)
+                    (* Log.out "test from inside mutex" *)
+                      (* Lwt.return_unit *)
+                    )
+         ))
          art_url
      in
 
@@ -307,9 +318,7 @@ let () =
     let name, msg = OBus_error.cast e in
     Printf.printf "DBus error (%s): %s" name msg
 
-(* TODO: pixbuf has more options to inspect pixels `get_pixels`
-   TODO: Install xdg
-*)
+(* TODO: Install xdg *)
 
 (* TODO: For image processing, could look at parallel processing:
    https://ocaml.org/manual/5.0/parallelism.html *)

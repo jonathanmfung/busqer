@@ -86,16 +86,18 @@ let octree_prop_tests =
          ]
 
 let otsuPcaPart_tests =
+  let open Lwt.Infix in
   let open Busqer.OtsuPcaPart in
   "ZipperTests"
   >::: [
          ( "centroids" >:: fun _ ->
            let m = Lacaml.S.Mat.empty in
            let elt = Lacaml.S.Vec.make0 3 in
-           let f z = go_left @@ grow_leaf z (fun _ -> (elt, m, m)) in
-           let x = unzip @@ f (f (f (mkzip (leaf m)))) in
-           let res = centroids x in
-           let exp = [ elt; elt; elt ] in
+           let f z = Lwt.map go_left @@ grow_leaf z (fun _ -> Lwt.return (elt, m, m)) in
+           let init = Lwt.return @@ mkzip (leaf m) in
+           let x = init >>= f >>= f >>= f >|= unzip in
+           let res = x >|= centroids in
+           let exp = Lwt.return [ elt; elt; elt ] in
            assert_equal res exp );
          ( "focus_max Identity" >:: fun _ ->
            let x = mkzip @@ leaf (Lacaml.S.Mat.make0 3 1) in
@@ -112,10 +114,10 @@ let otsuPcaPart_tests =
            let x =
              grow_leaf
                (mkzip @@ leaf Lacaml.S.Mat.empty)
-               (fun _ -> (centroid, l, r))
+               (fun _ -> Lwt.return (centroid, l, r))
            in
-           let res = focus_max_sse x in
-           let exp = go_right x in
+           let res = x >|= focus_max_sse in
+           let exp = x >|= go_right in
            assert_equal res exp );
        ]
 

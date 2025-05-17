@@ -1,27 +1,45 @@
+let (let*) = Lwt.bind
 module IntMap = Map.Make (Int)
 
 (* https://arxiv.org/pdf/1304.7465 pg 6 *)
 type bihist = { (* l : int;  *) t : int; freqs : float IntMap.t }
 
-let make_freqs (xs : int list) : float IntMap.t =
-  let counts =
-    List.fold_left
-      (fun acc x ->
-        IntMap.update x
-          (function None -> Some 1 | Some y -> Some (succ y))
-          acc)
-      IntMap.empty xs
-  in
-  let n_tot = Float.of_int @@ IntMap.fold (fun _k v acc -> v + acc) counts 0 in
-  IntMap.map (fun v -> Float.of_int v /. n_tot) counts
+module Inttbl = Hashtbl.Make (struct
+  type t = Int.t
+
+  let equal = Int.equal
+  let hash = Hashtbl.hash
+end)
+
+let make_freqs (xs : int list) : float IntMap.t Lwt.t =
+  let counts = Inttbl.create 256 in
+  let* () = Lwt_list.iter_p
+    (fun n ->
+      let cnt = Inttbl.find_opt counts n |> Option.value ~default:0 in
+      Lwt.return @@ Inttbl.replace counts n (succ cnt))
+    xs in
+  let (n_tot, ls) = Inttbl.fold (fun n cnt (tot,l) -> (cnt + tot , (n,cnt) :: l)) counts (0,[]) in
+  Lwt.return @@ IntMap.of_list @@ List.map (fun (n, c) -> (n, Float.of_int c /. (Float.of_int n_tot))) ls
+
+  (* let counts = *)
+  (*   List.fold_left *)
+  (*     (fun acc x -> *)
+  (*       IntMap.update x *)
+  (*         (function None -> Some 1 | Some y -> Some (succ y)) *)
+  (*         acc) *)
+  (*     IntMap.empty xs *)
+  (* in *)
+  (* let n_tot = Float.of_int @@ IntMap.fold (fun _k v acc -> v + acc) counts 0 in *)
+  (* IntMap.map (fun v -> Float.of_int v /. n_tot) counts *)
 
 let split_class (freqs : float IntMap.t) (t : int) :
     float IntMap.t * float IntMap.t =
   IntMap.partition (fun k _v -> k <= t) freqs
 
-let gen_bihist ~l (data : int list) : (int * bihist) list =
+let gen_bihist ~l (data : int list) : (int * bihist) list Lwt.t =
   let ts = List.init l (fun i -> i) in
-  List.mapi (fun i t -> (i, { (* l; *) t; freqs = make_freqs data })) ts
+  let* freqs = make_freqs data in
+  Lwt.return @@ List.mapi (fun i t -> (i, { (* l; *) t; freqs })) ts
 
 let argmax (bs : (int * bihist) list) (f : bihist -> 'a) : int =
   let max (i1, x1) (i2, x2) = if f x1 < f x2 then (i2, x2) else (i1, x1) in

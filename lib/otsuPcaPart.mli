@@ -15,6 +15,6 @@ val go_left : zipper -> zipper
 val go_right : zipper -> zipper
 val go_up : zipper -> zipper
 val unzip : zipper -> cluster_node
-val grow_leaf : zipper -> (data_t -> elt_t * data_t * data_t) -> zipper
+val grow_leaf : zipper -> (data_t -> (elt_t * data_t * data_t) Lwt.t) -> zipper Lwt.t
 val focus_max_sse : zipper -> zipper
-val cluster : data_t -> int -> cluster_node
+val cluster : data_t -> int -> cluster_node Lwt.t
