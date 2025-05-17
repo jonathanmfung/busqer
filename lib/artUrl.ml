@@ -86,12 +86,10 @@ let pixbuf_to_array (pb : GdkPixbuf.pixbuf) : pb_array =
   (* NOTE: Colorspace is only RGB *)
   let bits_per_sample = get_bits_per_sample pb in
   assert (bits_per_sample == 8);
-  Printf.printf "Bits_per_sample: %i\n" bits_per_sample;
 
   (* TODO: Handle n_channels/alpha
      I think a sequence would be easier to handle alpha *)
   let n_channels = get_n_channels pb in
-  Printf.printf "Num channels: %i\n" n_channels;
   let has_alpha = get_has_alpha pb in
   if has_alpha then failwith "Pixbuf has alpha channel";
   let height_px = get_height pb in
@@ -126,53 +124,70 @@ let pb_array_to_mat (arr : pb_array) =
 
 (* Copied from https://github.com/rlepigre/ocaml-imagelib/blob/master/unix/imageLib_unix.ml
    Which is GNU LGPL 3.0
-   Original convert::create_process runs concurrently, which I think means that filename' can be prematurely read by chunk_reader
-   Use open/close_process so that program blocks until `magick` terminates. *)
-let openfile fn : Image.image =
+   Original convert::create_process runs concurrently, which I think means that filename' can be prematurely read by chunk_reader.
+   Original convert also compares value of process, which is actually the PID, not return code.
+
+   Use of preemptive: https://stackoverflow.com/questions/19071158/lwt-and-database-access
+*)
+let openfile fn : Image.image Lwt.t =
+  let ( let* ) = Lwt.bind in
   let convert filename filename' =
     (* don't accidentally put command-line options here *)
     assert (String.get filename 0 <> '-');
     assert (String.get filename' 0 <> '-');
-    let ich, och =
-      Unix.open_process_args "magick" [| "magick"; filename; filename' |]
-    in
-    Unix.close_process (ich, och)
+    (* NOTE: original Unix.open_process is not Lwt-compliant  *)
+    Lwt_process.exec ("magick", [| "magick"; filename; filename' |])
   in
-  let rm filename = Sys.remove filename in
-  let extension = ImageUtil_unix.get_extension' fn in
-  Printf.printf "extension done \n";
-  let ich = ImageUtil_unix.chunk_reader_of_path fn in
-  Printf.printf "ich done \n";
-  let fallback () =
-    (* This will run imagemagick's "convert" utility to
-       transform the picture to PNG, then use the mature PNG reader.
-    *)
-    Printf.printf "starting fallback \n";
-    let fn' = Filename.temp_file "image" ".png" in
-    ignore @@ convert fn fn';
-    Printf.printf "fallback: convert done (%s) to (%s) \n" fn fn';
-    let ich' = ImageUtil_unix.chunk_reader_of_path fn' in
-    Printf.printf "fallback: ich' done \n";
-    let img = ImagePNG.parsefile ich' in
-    (* TODO: this is failing for some reason, even though repl works *)
-    Printf.printf "fallback: img done \n";
-    rm fn';
-    Printf.printf "fallback done \n";
-    img
+  (* let rm filename = Lwt_preemptive.detach Sys.remove filename in *)
+  let* extension = Lwt_preemptive.detach ImageUtil_unix.get_extension' fn in
+  let* () = Log.err "ext: %s" extension in
+
+  let* fn' = Lwt_preemptive.detach (Filename.temp_file "image") ".png" in
+  let* ret = convert fn fn' in
+  let* () =
+    match ret with
+    | WEXITED x -> Log.err "exit ret: %i" x
+    | WSIGNALED x -> Log.err "signaled ret: %i" x
+    | WSTOPPED x -> Log.err "stopped ret: %i" x
   in
-  if extension = "gif" then fallback ()
-    (* GIF support is still limited, to avoid breaking existing applications
-       we do not use it from the _unix module. *)
-  else
-    try ImageLib.openfile ~extension ich
-    with Image.Not_yet_implemented _ -> fallback ()
 
-let jpg_to_mat (path : string) : Lacaml.S.mat =
-  (* TODO: ocaml Unix.command is thinking that `convert` is erroring even when in bash the error code is 0
+  let* () = Lwt.pause () in     (* NOTE: make sure fn' data is populated *)
+  let* () = Log.err "Converted fn: %s to fn': %s" fn fn' in
+  (* let* ich' = Lwt.wrap (fun () -> ImageUtil_unix.chunk_reader_of_path fn') in *)
+  (* let* () = Log.err "finished ich'" in *)
 
-     reimplement ImageLib_unix.openfile but with convert not checking ret <> 0
-  *)
-  let img = openfile path in
+  (* TODO: img seems to be locking up GUI, specifically detach imagepng.parsefile *)
+  let* img =
+    Lwt.catch
+      (fun () ->
+        (* Lwt.fail (Invalid_argument "") *)
+
+        Lwt_io.with_file ~mode:Lwt_io.input fn'
+          (fun ch -> let* data = Lwt_io.read ch in
+                     let* chk_r = Lwt_preemptive.detach ImageUtil.chunk_reader_of_string data in
+                     Lwt_preemptive.detach ImagePNG.parsefile chk_r
+          )
+
+      (* Lwt.return @@ ImageLib.openfile ~extension:"png" ich' *)
+      (* let res = Lwt.wrap (fun () -> ImagePNG.parsefile ich') in let* ()=Log.err "finished imagepng parsefile" in res *)
+      (* Lwt_preemptive.detach ImagePNG.parsefile ich' *)
+      )
+      (function
+       | exn ->
+          let* () =
+            Log.err "artUrl::openfile::parsefile raised exn: %s"
+              (Printexc.to_string exn)
+          in
+          Lwt.return @@ Image.create_grey 10 10)
+  in
+  (* rm fn'; *)
+  let* () = Log.err "finished openfile::fallback" in
+  Lwt.return img
+(* Lwt.return @@ Image.create_rgb 10 10 *)
+
+let jpg_to_mat (path : string) : Lacaml.S.mat Lwt.t =
+  let ( let* ) = Lwt.bind in
+  let* img = openfile path in
   let read (row, col) : Lacaml.S.vec =
     (* TODO: double check Image.read arg order is col then row *)
     Image.read_rgb img col row (fun a b c ->
@@ -186,7 +201,7 @@ let jpg_to_mat (path : string) : Lacaml.S.mat =
          (List.init img.height (fun h -> h))
   in
   assert (img.width * img.height = Array.length img_coords);
-  Lacaml.S.Mat.of_col_vecs @@ Array.map read img_coords
+  Lwt.return @@ Lacaml.S.Mat.of_col_vecs @@ Array.map read img_coords
 
 (*
 Mean shift clustering
