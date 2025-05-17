@@ -203,6 +203,35 @@ let jpg_to_mat (path : string) : Lacaml.S.mat Lwt.t =
   assert (img.width * img.height = Array.length img_coords);
   Lwt.return @@ Lacaml.S.Mat.of_col_vecs @@ Array.map read img_coords
 
+let stb_to_mat (path : string) : (Lacaml.S.mat, 'b) Result.t=
+  let open StbImageOcaml.Stb_image in
+  let open Bigarray.Array1 in
+  let (let*) = Result.bind in
+  let* img = load path in
+  let buf = data img in
+  let chs = channels img in
+  let wid = width img in
+  let hei = height img in
+  let stride = chs * wid in
+  let get c x y =
+    (* NOTE: formula from stb_image.mli *)
+    let i = y * stride + x * chs + c in
+    get buf i
+  in
+  let get_px (x, y) =
+    let f n = Float.of_int @@ get n x y in
+    (* TODO: parmaterize over channels (chs) *)
+    Lacaml.S.Vec.of_array [| f 0 ; f 1; f 2|] in
+  let img_coords =
+    Array.concat
+    @@ List.map
+         (fun h -> Array.init wid (fun w -> (h, w)))
+         (List.init hei (fun h -> h))
+  (* TODO: double-check x/y and height/width is properly matching *)
+  in
+  assert (img.width * img.height = Array.length img_coords);
+  Result.ok @@ Lacaml.S.Mat.of_col_vecs @@ Array.map get_px img_coords
+
 (*
 Mean shift clustering
 Init cluster starts at first pixel's color

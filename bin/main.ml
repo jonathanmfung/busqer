@@ -257,9 +257,13 @@ let gui () =
                let ( let* ) = Lwt.bind in
                (* TODO: jpg_to_mat (my openfile) has in_channels that are not Lwt *)
                (* TODO: jpg_to_mat seems to be blocking GUI ????*)
-               let* mat = ArtUrl.jpg_to_mat a_filepath in
-               let* () = Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 mat) in
-               let* centroids = mat_to_centroids mat in
+               (* let* mat = ArtUrl.jpg_to_mat a_filepath in *)
+               let* mat = Lwt_preemptive.detach ArtUrl.stb_to_mat a_filepath in
+               let* mat' = match mat with
+                 | Result.Error e -> failwith "stb fail load"
+                 | Result.Ok x -> Lwt.return x in
+               let* () = Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 mat') in
+               let* centroids = mat_to_centroids mat' in
                let color = centroids_to_ran_color centroids in
                let prov = mk_provider (css_str color) in
                let* () = Log.err "ran_color: %s" color in
