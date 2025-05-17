@@ -44,6 +44,19 @@ let
     ];
     doCheck = true;
   };
+  stb_image = pkgs.ocamlPackages.buildDunePackage {
+    pname = "stb_image";
+    version = "0.5";
+
+    src = pkgs.fetchFromGitHub {
+      owner = "let-def";
+      repo = "stb_image";
+      rev = "5687731cfcc7ea773fa9eb44bb351035956f5710";
+      hash = "sha256-NsXOjDxo8iUnLouMnKE+QvpyiJ2m5zH4/We2o9UWieE=";
+    };
+
+    patches = [ ./stb_image_dune.patch ];
+  };
 in
 pkgs.mkShell {
   pname = "busqer";
@@ -72,6 +85,7 @@ pkgs.mkShell {
     ocamlPackages.cohttp-lwt-unix
     ocamlPackages.lacaml
     ocamlPackages.imagelib
+    stb_image
     obus
     lwt_glib
 

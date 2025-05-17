@@ -1,0 +1,82 @@
+diff --git a/Makefile b/Makefile
+index 63d1b38..d41c128 100644
+--- a/Makefile
++++ b/Makefile
+@@ -17,21 +17,21 @@ dll_stb_image_stubs$(EXT_DLL) lib_stb_image_stubs$(EXT_LIB): ml_stb_image$(EXT_O
+ 	$(OCAMLMKLIB) -o _stb_image_stubs $<
+ 
+ stb_image.cmi: stb_image.mli
+-	$(OCAMLC) -package result -c $<
++	$(OCAMLC) -c $<
+ 
+ stb_image.cmo: stb_image.ml stb_image.cmi
+-	$(OCAMLC) -package result -c $<
++	$(OCAMLC) -c $<
+ 
+ stb_image.cma: stb_image.cmo dll_stb_image_stubs$(EXT_DLL)
+-	$(OCAMLC) -package result -a -custom -o $@ $< \
++	$(OCAMLC) -a -custom -o $@ $< \
+ 	       -dllib dll_stb_image_stubs$(EXT_DLL) \
+ 	       -cclib -l_stb_image_stubs
+ 
+ stb_image.cmx: stb_image.ml stb_image.cmi
+-	$(OCAMLOPT) -package result -c $<
++	$(OCAMLOPT) -c $<
+ 
+ stb_image.cmxa stb_image$(EXT_LIB): stb_image.cmx dll_stb_image_stubs$(EXT_DLL)
+-	$(OCAMLOPT) -package result -a -o $@ $< \
++	$(OCAMLOPT) -a -o $@ $< \
+ 	       -cclib -l_stb_image_stubs
+ 
+ .PHONY: clean install uninstall reinstall
+diff --git a/dune b/dune
+new file mode 100644
+index 0000000..8cb21b7
+--- /dev/null
++++ b/dune
+@@ -0,0 +1,11 @@
++(rule
++ (targets lib_stb_image_stubs.a dll_stb_image_stubs.so)
++  (deps Makefile ml_stb_image.c stb_image.h stb_image.ml stb_image.mli)
++  (action
++   (no-infer
++    (run make))))
++
++(library
++ (name StbImageOcaml)
++ (public_name stb_image)
++ (foreign_archives _stb_image_stubs))
+\ No newline at end of file
+diff --git a/dune-project b/dune-project
+new file mode 100644
+index 0000000..5486515
+--- /dev/null
++++ b/dune-project
+@@ -0,0 +1,2 @@
++(lang dune 3.16)
++ (package (name stb_image) (depends StbImageOcaml) (allow_empty))
+diff --git a/stb_image.ml b/stb_image.ml
+index e16f905..994a375 100644
+--- a/stb_image.ml
++++ b/stb_image.ml
+@@ -1,6 +1,6 @@
+ open Bigarray
+ 
+-type 'a result = ('a, [`Msg of string]) Result.result
++type 'a result = ('a, [`Msg of string]) Result.t
+ 
+ type 'kind buffer = ('a, 'b, c_layout) Array1.t
+   constraint 'kind = ('a, 'b) kind
+diff --git a/stb_image.mli b/stb_image.mli
+index 93a1690..c7cd88e 100644
+--- a/stb_image.mli
++++ b/stb_image.mli
+@@ -14,7 +14,7 @@
+ *)
+ open Bigarray
+ 
+-type 'a result = ('a, [`Msg of string]) Result.result
++type 'a result = ('a, [`Msg of string]) Result.t
+ 
+ 
+ (*##############################*)
