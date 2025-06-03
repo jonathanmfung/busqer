@@ -102,5 +102,6 @@ pkgs.mkShell {
     ocamlPackages.utop
     ocamlPackages.ocaml-lsp
     ocamlformat
+    linuxKernel.packages.linux_6_6.perf
   ];
 }

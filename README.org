@@ -2,9 +2,14 @@
 dune build
 dune runtest
 dune exec busqer_bin
+GTK_DEBUG=interactve dune exec busqer_bin # enable GTK Inspector
 #+end_src
 
-- Simple Spotify interface through DBus
+TODO: combine art_url react triggers
+TODO: just use spotify color api (look at full art display spicetify plugin)
+requires user-token https://github.com/spicetify/cli/blob/41ed71842258a77dc4725ea70a397f83021b7f12/jsHelper/spicetifyWrapper.js#L1184
+
+- Simple Spotify client via DBus/MPRIS interface
   - [ ] Display Album Art (metadata - mpris:artUrl)
   - [X] Display artist (metadata - xesam:artist)
   - [ ] Display album (metadata - xesam:album)

@@ -157,11 +157,6 @@ let gui () =
        OtsuPcaPart.to_hexstring (rng_elt (Array.of_list c))
      in
 
-     (* let pb_to_ran_color pb : string= *)
-     (*   let data = ArtUrl.(pb_array_to_mat (pixbuf_to_array pb)) in *)
-     (*   Printf.printf "data done\n"; *)
-     (*   mat_to_ran_color data *)
-     (* in *)
      let css_provider_from_data data =
        let provider = GObj.css_provider () in
        provider#load_from_data data;
@@ -187,13 +182,6 @@ let gui () =
          "* { color: blue } label#track_info {background-color: %s}" color
      in
 
-     (* let red = mk_provider (css_str "red") in *)
-     (* let green = mk_provider (css_str "#00ff00") in *)
-     (* add_provider_to_screen red; *)
-     (* let* () = Lwt_unix.sleep 2.0 in *)
-     (* remove_provider_from_screen red; *)
-     (* add_provider_to_screen green; *)
-
      (* track_info_w#misc#style_context#add_provider (\* Does not cascade! *\) *)
      (*   (css_provider_from_data "* { background-color: red }") *)
      (*   GtkData.StyleContext.ProviderPriority.application; *)
@@ -202,9 +190,6 @@ let gui () =
      (*   (css_provider_from_data "* { background-color: purple }") *)
      (*   GtkData.StyleContext.ProviderPriority.application; *)
 
-     (* GtkData.Style.set_bg (track_info_w#style) `NORMAL (Gdk.Color.color_parse "#ff00ff"); *)
-     (* let style = track_info_w#misc#style#copy in *)
-     (* style#set_bg [`NORMAL,`NAME "#ff00ff"]; *)
      let pb_init = GdkPixbuf.create ~width:1 ~height:1 () in
      let img = GMisc.image ~pixbuf:pb_init ~packing:vbox#add () in
 
@@ -215,15 +200,6 @@ let gui () =
         GdkPixbuf.get_pixels (GdkPixbuf.from_file "./test/data/ab67616d0000b27338d7a50443e2a6043d6da247.jpg");;
 
         get_pixels seems to have some issues: https://github.com/bcpierce00/unison/issues/1075
-
-        TODO:
-        let buf =
-          let b = Buffer.create (640*640) in
-          GdkPixbuf.save_to_buffer ~typ:"bmp" (GdkPixbuf.from_file "./test/data/ab67616d0000b27338d7a50443e2a6043d6da247.jpg") b;
-          b;;
-        Thinking of saving in-memory Buffer, then using another Image library to read raw pixels (stb_image, imagelib, Camlimages)
-          Library should be able to read Buffer.t (else would have to read from cache)
-        Gtk seems to support saving as “jpeg”, “png”, “ico” and “bmp”
      *)
      let colors = [| "#ff0000"; "#00ff00"; "#0000ff" |] in
 
@@ -231,55 +207,79 @@ let gui () =
        Lwt_react.S.map
          (fun au ->
            Lwt_result.bind au (fun a ->
-               let ( let* ) = Lwt_result.bind in
-               let* () =
-                 Lwt_result.map_error (fun e -> [ e ]) (ArtUrl.A.to_cache a)
-               in
+               let open Lwt.Infix in
+               let cache_res = (let* a = Lwt_preemptive.detach ArtUrl.A.to_cache a in Lwt.return ()) in
+
                let a_filepath = ArtUrl.A.abs_path a in
-               let pb = GdkPixbuf.from_file a_filepath in
-               Lwt_result.return
-               @@ Lwt_mutex.with_lock mx_gui (fun () ->
-                      Lwt.return @@ img#set_pixbuf pb)))
+               let pb = Lwt_preemptive.detach GdkPixbuf.from_file a_filepath in
+               let setter = pb >>= (fun x -> let* a = Lwt_preemptive.detach img#set_pixbuf x in Lwt.return ())  in
+
+               (* let mat = Lwt_preemptive.detach ArtUrl.stb_to_mat a_filepath in *)
+               (* let mat' = mat >>= fun x -> match x with *)
+               (*   | Result.Error e -> failwith "stb fail load" *)
+               (*   | Result.Ok x -> Lwt.return x in *)
+
+               let mat' = ArtUrl.stb_to_mat a_filepath in
+
+               (* let mat' = ArtUrl.jpg_to_mat a_filepath in *)
+
+               (* let mat_res = mat' >>= fun x -> let () = track_info_w#set_text (rng_elt colors) in *)
+               (*                                 Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 x) in *)
+               let mat_res = mat'
+                             |> Lwt_result.map_error (fun _ -> Failure "mat failure")
+                             |> Lwt_result.get_exn >>=
+                               fun m -> let () = track_info_w#set_text (rng_elt colors) in
+                                        Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 m) in
+
+               (* let mat_res = (let* a = Lwt_preemptive.detach ArtUrl.stb_to_mat a_filepath in Lwt.return () ) in *)
+
+               (* Lwt_result.return @@ Lwt.join [cache_res; setter] *)
+               (* Lwt_result.return @@ Lwt.join [setter; mat_res] *)
+               Lwt_result.return @@ Lwt.join [cache_res; setter; mat_res]
+              (* Lwt_result.return mat_res *)
+             ))
          art_url
      in
 
-     let _update_album_color =
-       Lwt_react.S.map
-         (fun au ->
-           Lwt_result.bind au (fun a ->
-               let ( let* ) = Lwt_result.bind in
-               (* let* () = *)
-               (*   Lwt_result.map_error (fun e -> [ e ]) (ArtUrl.A.to_cache a) *)
-               (* in *)
-               let a_filepath = ArtUrl.A.abs_path a in
-               (* let a_filepath = "/home/jonat/ocaml/busqer/test/data/black_10x10.jpg" in *)
-               (* TODO: Need to understand how (Lwt)_React handles queues of updates (e.g. skipping many times) *)
-               let ( let* ) = Lwt.bind in
-               (* TODO: jpg_to_mat (my openfile) has in_channels that are not Lwt *)
-               (* TODO: jpg_to_mat seems to be blocking GUI ????*)
-               (* let* mat = ArtUrl.jpg_to_mat a_filepath in *)
-               let* mat = Lwt_preemptive.detach ArtUrl.stb_to_mat a_filepath in
-               let* mat' = match mat with
-                 | Result.Error e -> failwith "stb fail load"
-                 | Result.Ok x -> Lwt.return x in
-               let* () = Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 mat') in
-               let* centroids = mat_to_centroids mat' in
-               let color = centroids_to_ran_color centroids in
-               let prov = mk_provider (css_str color) in
-               let* () = Log.err "ran_color: %s" color in
-               Lwt_result.return
-               @@ Lwt_mutex.with_lock mx_gui (fun () ->
-                      track_info_w#set_text color;
-                      Lwt.return @@ add_provider_to_screen prov
-                    (* TODO: maybe add_provider calls some blocking io?  *)
-                    (* Log.out "test from inside mutex" *)
-                      (* Lwt.return_unit *)
-                    )
-         ))
-         art_url
-     in
+     (* let _update_album_color = *)
+     (*   Lwt_react.S.map *)
+     (*     (fun au -> *)
+     (*       Lwt_result.bind au (fun a -> *)
+     (*           (\* TODO: Need to understand how (Lwt)_React handles queues of updates (e.g. skipping track many times) *\) *)
+     (*           let a_filepath = ArtUrl.A.abs_path a in *)
+     (*           (\* let a_filepath = "/home/jonat/ocaml/busqer/test/data/black_10x10.jpg" in *\) *)
+     (*           let ( let* ) = Lwt.bind in *)
+     (*           (\* TODO: jpg_to_mat AND stb_to_mat block GUI *\) *)
+     (*           (\* let* mat = ArtUrl.jpg_to_mat a_filepath in *\) *)
+     (*           (\* let mat = ArtUrl.stb_to_mat a_filepath in *\) *)
+     (*           let* mat = Lwt.catch *)
+     (*                        (fun () -> Lwt_preemptive.detach ArtUrl.stb_to_mat a_filepath) *)
+     (*                        (function *)
+     (*                         | exn -> *)
+     (*                            let*()=Log.err "stb_to_mat fail" in *)
+     (*                            failwith(Format.sprintf "stb_to_mat failed with: %s" (Printexc.to_string exn))) in *)
+     (*           let* mat' = match mat with *)
+     (*             | Result.Error e -> failwith "stb fail load" *)
+     (*             | Result.Ok x -> Lwt.return x in *)
+     (*           let* () = Log.err "mat dim2: %i" (Lacaml.S.Mat.dim2 mat') in *)
+     (*           let* centroids = mat_to_centroids mat' in *)
+     (*           let color = centroids_to_ran_color centroids in *)
+     (*           let prov = mk_provider (css_str color) in *)
+     (*           let* () = Log.err "ran_color: %s" color in *)
+     (*           Lwt_result.return *)
+     (*           @@ Lwt_mutex.with_lock mx_gui (fun () -> *)
+     (*                  track_info_w#set_text color; *)
+     (*                  Lwt_preemptive.detach add_provider_to_screen prov *)
+     (*                (\* Log.out "test from inside mutex" *\) *)
+     (*                (\* Lwt.return () *\) *)
+     (*                ) *)
+     (*     )) *)
+     (*     art_url *)
+     (* in *)
 
      (* TODO: GUI freezes when program is started and current track's art_url needs to be url fetched *)
+
+     let* () = Lwt_unix.sleep 0.1 in (* Give GUI time to setup? *)
 
      (* Update Position *)
      let update_position_tick pos setter =
@@ -287,7 +287,7 @@ let gui () =
        let new_pos = Int64.add (Lwt_react.S.value pos) 1_000_000L in
        (* NOTE: This feels hacky, don't know if S.value should be used sparingly or not *)
        let () = setter new_pos in
-       Lwt.return_unit
+       Lwt.return ()
      in
      (* NOTE: recursive loop technique from https://stackoverflow.com/a/40695385/28633986 *)
      let rec update_loop () =
@@ -303,12 +303,12 @@ let gui () =
        let sleep_dur = 1. /. Lwt_react.S.value rate in
 
        (* NOTE: Does not with if `let _` *)
+       (* let* () = Log.err "Sleeping for %1.2f" sleep_dur in *)
        let* () = Lwt_unix.sleep sleep_dur in
        match Lwt.state waiter with
        | Lwt.Return v -> waiter
-       (* TODO: Handle Fail (logging) *)
        | Lwt.Fail exn ->
-           let* () = Log.err "Waiter Failed" in
+           let* () = Log.err "Waiter Failed: %s" (Printexc.to_string exn) in
            waiter
        | Lwt.Sleep -> update_loop ()
      in

@@ -181,7 +181,7 @@ let openfile fn : Image.image Lwt.t =
           Lwt.return @@ Image.create_grey 10 10)
   in
   (* rm fn'; *)
-  let* () = Log.err "finished openfile::fallback" in
+  let* () = Log.err "finished jpg::openfile::fallback" in
   Lwt.return img
 (* Lwt.return @@ Image.create_rgb 10 10 *)
 
@@ -203,11 +203,11 @@ let jpg_to_mat (path : string) : Lacaml.S.mat Lwt.t =
   assert (img.width * img.height = Array.length img_coords);
   Lwt.return @@ Lacaml.S.Mat.of_col_vecs @@ Array.map read img_coords
 
-let stb_to_mat (path : string) : (Lacaml.S.mat, 'b) Result.t=
+let stb_to_mat (path : string) : (Lacaml.S.mat, 'b) Lwt_result.t =
   let open StbImageOcaml.Stb_image in
   let open Bigarray.Array1 in
-  let (let*) = Result.bind in
-  let* img = load path in
+  let (let*) = Lwt_result.bind in
+  let* img = Lwt_preemptive.detach load path in
   let buf = data img in
   let chs = channels img in
   let wid = width img in
@@ -230,7 +230,7 @@ let stb_to_mat (path : string) : (Lacaml.S.mat, 'b) Result.t=
   (* TODO: double-check x/y and height/width is properly matching *)
   in
   assert (img.width * img.height = Array.length img_coords);
-  Result.ok @@ Lacaml.S.Mat.of_col_vecs @@ Array.map get_px img_coords
+  Lwt_result.return @@ Lacaml.S.Mat.of_col_vecs @@ Array.map get_px img_coords
 
 (*
 Mean shift clustering

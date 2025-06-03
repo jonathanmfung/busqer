@@ -21,17 +21,6 @@ let make_freqs (xs : int list) : float IntMap.t Lwt.t =
   let (n_tot, ls) = Inttbl.fold (fun n cnt (tot,l) -> (cnt + tot , (n,cnt) :: l)) counts (0,[]) in
   Lwt.return @@ IntMap.of_list @@ List.map (fun (n, c) -> (n, Float.of_int c /. (Float.of_int n_tot))) ls
 
-  (* let counts = *)
-  (*   List.fold_left *)
-  (*     (fun acc x -> *)
-  (*       IntMap.update x *)
-  (*         (function None -> Some 1 | Some y -> Some (succ y)) *)
-  (*         acc) *)
-  (*     IntMap.empty xs *)
-  (* in *)
-  (* let n_tot = Float.of_int @@ IntMap.fold (fun _k v acc -> v + acc) counts 0 in *)
-  (* IntMap.map (fun v -> Float.of_int v /. n_tot) counts *)
-
 let split_class (freqs : float IntMap.t) (t : int) :
     float IntMap.t * float IntMap.t =
   IntMap.partition (fun k _v -> k <= t) freqs

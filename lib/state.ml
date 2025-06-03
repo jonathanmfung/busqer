@@ -88,7 +88,7 @@ end = struct
 
   let if_playing playback_status f =
     match playback_status with
-    | Paused | Stopped -> Lwt.return_unit
+    | Paused | Stopped -> Lwt.return ()
     | Playing -> f ()
 end
 
